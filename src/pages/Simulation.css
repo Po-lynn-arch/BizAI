@@ -1,0 +1,94 @@
+.sim-form {
+  background-color: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.sim-form h3 {
+  margin: 0 0 20px;
+  font-size: 16px;
+}
+
+.sim-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.reset-btn {
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: #aaaaaa;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.reset-btn:hover {
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.sim-results {
+  background-color: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  padding: 28px;
+}
+
+.sim-results h3 {
+  margin: 0 0 20px;
+  font-size: 16px;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.result-card {
+  background-color: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.result-label {
+  color: #aaaaaa;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.result-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffffff;
+  margin: 0 0 8px;
+}
+
+.result-note {
+  font-size: 12px;
+  color: #aaaaaa;
+  margin: 0;
+}
+
+.result-card.positive {
+  border-color: #10B981;
+}
+
+.result-card.positive .result-value {
+  color: #10B981;
+}
+
+.result-card.negative {
+  border-color: #ff4444;
+}
+
+.result-card.negative .result-value {
+  color: #ff4444;
+}

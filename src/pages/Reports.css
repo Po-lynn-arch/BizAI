@@ -1,0 +1,11 @@
+.reports-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.totals-row {
+  border-top: 1px solid #10B981;
+  color: #10B981;
+}

@@ -1,0 +1,92 @@
+.entry-form {
+  background-color: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 30px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  color: #aaaaaa;
+  font-size: 13px;
+}
+
+.form-field input,
+.form-field select {
+  background-color: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  border-color: #10B981;
+}
+
+.add-btn {
+  background-color: #10B981;
+  color: #000000;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.add-btn:hover {
+  background-color: #34d399;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.delete-btn:hover {
+  background-color: #2a2a2a;
+}
+
+.badge-income {
+  background-color: #052e16;
+  color: #10B981;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.badge-expense {
+  background-color: #2d0000;
+  color: #ff4444;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.empty-state {
+  color: #aaaaaa;
+  font-size: 14px;
+  text-align: center;
+  padding: 40px 0;
+}

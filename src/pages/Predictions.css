@@ -1,0 +1,62 @@
+.predictions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 30px;
+}
+
+.prediction-card {
+  background-color: #111111;
+  border: 2px solid #2a2a2a;
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.prediction-card:hover {
+  transform: translateY(-4px);
+}
+
+.medal {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.product-name {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+  margin: 0 0 8px;
+}
+
+.product-revenue {
+  font-size: 20px;
+  font-weight: bold;
+  color: #10B981;
+  margin: 0 0 4px;
+}
+
+.product-label {
+  font-size: 12px;
+  color: #aaaaaa;
+  margin: 0 0 16px;
+}
+
+.prediction-note {
+  font-size: 12px;
+  color: #aaaaaa;
+  background-color: #1a1a1a;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.prediction-disclaimer {
+  background-color: #111111;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 16px 20px;
+  color: #aaaaaa;
+  font-size: 13px;
+  line-height: 1.6;
+}
