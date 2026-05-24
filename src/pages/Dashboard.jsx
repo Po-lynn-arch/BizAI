@@ -11,8 +11,10 @@ import {
 } from 'recharts'
 
 import { Sidebar } from '../components/Sidebar'
+import { useSessionExpiry } from '../useSessionExpiry'
 
 export function Dashboard() {
+  useSessionExpiry(30)
 
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
