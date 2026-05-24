@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 
 import { Sidebar } from '../components/Sidebar'
-import { useSessionExpiry } from '../useSessionExpiry'
+import { useSessionExpiry } from './UseSessionExpiry'
 
 export function Dashboard() {
   useSessionExpiry(30)
