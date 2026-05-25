@@ -16,7 +16,6 @@ export function useSessionExpiry(minutes = 30) {
       }, minutes * 60 * 1000)
     }
 
-    // reset timer on any user activity
     window.addEventListener('mousemove', resetTimer)
     window.addEventListener('keypress', resetTimer)
     window.addEventListener('click', resetTimer)
@@ -28,5 +27,5 @@ export function useSessionExpiry(minutes = 30) {
       window.removeEventListener('keypress', resetTimer)
       window.removeEventListener('click', resetTimer)
     }
-  }, [])
+  }, [navigate, minutes])
 }

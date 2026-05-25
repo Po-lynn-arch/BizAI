@@ -7,42 +7,96 @@ export function SalesEntry() {
   const [sales, setSales] = useState([])
   const [stock, setStock] = useState([])
   const [product, setProduct] = useState('')
+  const [mode, setMode] = useState('single') // 'single' or 'multi'
   const [qty, setQty] = useState('')
   const [price, setPrice] = useState('')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  // Multi-price entries: [{qty_sold, price_per_unit}]
+  const [entries, setEntries] = useState([{ qty_sold: '', price_per_unit: '' }])
 
   function loadData() {
     fetch(`http://127.0.0.1:5000/api/sales?user_id=${user.id}`)
-      .then(res => res.json()).then(d => setSales(d))
+      .then(res => res.json()).then(setSales)
     fetch(`http://127.0.0.1:5000/api/stock?user_id=${user.id}`)
-      .then(res => res.json()).then(d => setStock(d))
+      .then(res => res.json()).then(setStock)
   }
 
   useEffect(() => { loadData() }, [])
 
   const selectedStock = stock.find(s => s.product === product)
+  const today = new Date().toLocaleDateString()
+  const todaySales = sales.filter(s => s.date === today)
+  const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
+  const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
 
-  async function recordSale() {
-    if (!product || !qty || !price) { setError('Please fill in all fields'); return }
-    if (Number(qty) <= 0 || Number(price) <= 0) { setError('Quantity and price must be greater than zero'); return }
+  function addEntry() {
+    setEntries([...entries, { qty_sold: '', price_per_unit: '' }])
+  }
 
-    const response = await fetch('http://127.0.0.1:5000/api/sales', {
+  function removeEntry(idx) {
+    if (entries.length === 1) return
+    setEntries(entries.filter((_, i) => i !== idx))
+  }
+
+  function updateEntry(idx, field, value) {
+    const updated = [...entries]
+    updated[idx][field] = value
+    setEntries(updated)
+  }
+
+  const multiTotals = entries.reduce((acc, e) => {
+    const q = Number(e.qty_sold) || 0
+    const p = Number(e.price_per_unit) || 0
+    const cost = selectedStock?.cost_per_unit || 0
+    acc.qty += q
+    acc.revenue += q * p
+    acc.profit += (p - cost) * q
+    return acc
+  }, { qty: 0, revenue: 0, profit: 0 })
+
+  async function recordSingleSale() {
+    setError(''); setSuccess('')
+    if (!product || !qty || !price) { setError('Fill all fields'); return }
+    const res = await fetch('http://127.0.0.1:5000/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user_id: user.id,
-        product,
-        qty_sold: Number(qty),
-        price_per_unit: Number(price),
-        date: new Date().toLocaleDateString()
+        user_id: user.id, product,
+        qty_sold: Number(qty), price_per_unit: Number(price),
+        date: today
       })
     })
-
-    const data = await response.json()
-    if (response.ok) {
-      setError('')
-      loadData()
+    const data = await res.json()
+    if (res.ok) {
+      setSuccess('Sale recorded!')
       setQty(''); setPrice('')
+      loadData()
+    } else {
+      setError(data.error)
+    }
+  }
+
+  async function recordMultiSale() {
+    setError(''); setSuccess('')
+    if (!product) { setError('Select a product'); return }
+    const validEntries = entries.filter(e => Number(e.qty_sold) > 0 && Number(e.price_per_unit) > 0)
+    if (validEntries.length === 0) { setError('Add at least one entry with qty and price'); return }
+    const res = await fetch('http://127.0.0.1:5000/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: user.id, product,
+        entries: validEntries.map(e => ({ qty_sold: Number(e.qty_sold), price_per_unit: Number(e.price_per_unit) })),
+        date: today
+      })
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setSuccess(`${validEntries.length} sale entries recorded!`)
+      setEntries([{ qty_sold: '', price_per_unit: '' }])
+      loadData()
     } else {
       setError(data.error)
     }
@@ -53,24 +107,17 @@ export function SalesEntry() {
     loadData()
   }
 
-  const todaySales = sales.filter(s => s.date === new Date().toLocaleDateString())
-  const todayTotal = todaySales.reduce((sum, s) => sum + s.total_earned, 0)
-
   return (
     <div className="dashboard">
       <Sidebar />
       <div className="main-content-area">
         <header className="topbar">
-          <div>
-            <h2>📝 Record Sales</h2>
-            <p>Record products you have sold today</p>
-          </div>
+          <h2>📝 Sales</h2>
+          <p>Record sales — profit calculated automatically from your stock cost</p>
         </header>
 
         <div className="entry-form">
-          <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#10B981', fontSize: '14px' }}>
-            💡 Select a product from your stock, enter how many you sold and at what price. The system will automatically deduct from your stock and calculate your profit.
-          </div>
+          {/* Product selector */}
           <div className="form-row">
             <div className="form-field">
               <label>Product</label>
@@ -78,64 +125,127 @@ export function SalesEntry() {
                 <option value="">-- Select product --</option>
                 {stock.map(s => (
                   <option key={s.id} value={s.product}>
-                    {s.product} ({s.qty_remaining} units available)
+                    {s.product} ({s.qty_remaining} units left)
                   </option>
                 ))}
               </select>
             </div>
-            <div className="form-field">
-              <label>Quantity Sold</label>
-              <input type="number" placeholder="e.g. 45" value={qty} onChange={e => setQty(e.target.value)} />
-            </div>
-            <div className="form-field">
-              <label>Selling Price per Unit (KES)</label>
-              <input type="number" placeholder="e.g. 80" value={price} onChange={e => setPrice(e.target.value)} />
-            </div>
           </div>
 
-          {selectedStock && qty && price && (
-            <div style={{ background: '#111', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '12px', marginBottom: '12px', fontSize: '13px' }}>
-              <p style={{ color: '#10B981' }}>✅ Total earned: KES {(Number(qty) * Number(price)).toLocaleString()}</p>
-              <p style={{ color: '#FFA500' }}>📦 Stock cost: KES {(selectedStock.cost_per_unit * Number(qty)).toLocaleString()}</p>
-              <p style={{ color: '#fff' }}>💰 Profit from this sale: KES {((Number(price) - selectedStock.cost_per_unit) * Number(qty)).toLocaleString()}</p>
-              <p style={{ color: '#aaa' }}>📊 Remaining after sale: {selectedStock.qty_remaining - Number(qty)} units</p>
+          {selectedStock && (
+            <div style={{ background: '#111', border: '1px solid #2a2a2a', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: '#aaa' }}>
+              Cost per unit: <strong style={{ color: '#FFA500' }}>KES {selectedStock.cost_per_unit}</strong> &nbsp;|&nbsp;
+              In stock: <strong style={{ color: '#10B981' }}>{selectedStock.qty_remaining} units</strong>
+              {selectedStock.suggested_price > 0 && <>&nbsp;|&nbsp; Suggested price: <strong style={{ color: '#3b82f6' }}>KES {selectedStock.suggested_price}</strong></>}
             </div>
           )}
 
-          {error && <p style={{ color: 'red', fontSize: '14px', marginBottom: '8px' }}>{error}</p>}
-          <button className="add-btn" onClick={recordSale}>+ Record Sale</button>
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {[['single', '📝 Single Price'], ['multi', '🗂 Multiple Prices']].map(([m, label]) => (
+              <button key={m} onClick={() => setMode(m)} style={{
+                padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                background: mode === m ? '#10B981' : 'transparent',
+                color: mode === m ? '#fff' : '#aaa',
+                border: mode === m ? 'none' : '1px solid #2a2a2a'
+              }}>{label}</button>
+            ))}
+          </div>
+
+          {mode === 'single' ? (
+            <>
+              <div className="form-row">
+                <div className="form-field">
+                  <label>Qty Sold</label>
+                  <input type="number" placeholder="e.g. 5" value={qty} onChange={e => setQty(e.target.value)} />
+                </div>
+                <div className="form-field">
+                  <label>Selling Price per Unit (KES)</label>
+                  <input type="number" placeholder="e.g. 150" value={price} onChange={e => setPrice(e.target.value)} />
+                </div>
+              </div>
+              {selectedStock && qty && price && (
+                <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px' }}>
+                  <p style={{ color: '#10B981' }}>Revenue: KES {(Number(qty) * Number(price)).toLocaleString()}</p>
+                  <p style={{ color: '#fff' }}>Profit: KES {((Number(price) - selectedStock.cost_per_unit) * Number(qty)).toLocaleString()}</p>
+                  <p style={{ color: '#aaa' }}>Remaining after sale: {selectedStock.qty_remaining - Number(qty)} units</p>
+                </div>
+              )}
+              <button className="add-btn" onClick={recordSingleSale}>+ Record Sale</button>
+            </>
+          ) : (
+            <>
+              <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: '#93c5fd' }}>
+                💡 Use this when you sold the same product at different prices. E.g. trousers sold at KES 800, KES 900, and KES 1000 — add one row per price.
+              </div>
+
+              {entries.map((entry, idx) => (
+                <div key={idx} className="form-row" style={{ alignItems: 'flex-end', marginBottom: '10px' }}>
+                  <div className="form-field">
+                    <label>Qty Sold (Price {idx + 1})</label>
+                    <input type="number" placeholder="e.g. 3" value={entry.qty_sold}
+                      onChange={e => updateEntry(idx, 'qty_sold', e.target.value)} />
+                  </div>
+                  <div className="form-field">
+                    <label>Price per Unit (KES)</label>
+                    <input type="number" placeholder="e.g. 900" value={entry.price_per_unit}
+                      onChange={e => updateEntry(idx, 'price_per_unit', e.target.value)} />
+                  </div>
+                  {entry.qty_sold && entry.price_per_unit && selectedStock && (
+                    <div style={{ padding: '8px', fontSize: '12px', color: '#10B981', minWidth: '140px' }}>
+                      Profit: KES {((Number(entry.price_per_unit) - selectedStock.cost_per_unit) * Number(entry.qty_sold)).toLocaleString()}
+                    </div>
+                  )}
+                  <button onClick={() => removeEntry(idx)} style={{ background: '#2b0d0d', border: '1px solid #ff4444', color: '#ff4444', borderRadius: '6px', padding: '8px 12px', cursor: 'pointer', marginBottom: '4px' }}>✕</button>
+                </div>
+              ))}
+
+              <button onClick={addEntry} style={{ background: 'transparent', border: '1px dashed #3b82f6', color: '#3b82f6', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', marginBottom: '16px', fontSize: '13px' }}>
+                + Add Another Price
+              </button>
+
+              {multiTotals.qty > 0 && (
+                <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px' }}>
+                  <p style={{ color: '#10B981' }}>Total qty: {multiTotals.qty} units &nbsp;|&nbsp; Total revenue: KES {multiTotals.revenue.toLocaleString()}</p>
+                  <p style={{ color: '#fff' }}>Total profit: KES {multiTotals.profit.toLocaleString()}</p>
+                </div>
+              )}
+
+              <button className="add-btn" onClick={recordMultiSale}>+ Record All Sales</button>
+            </>
+          )}
+
+          {error && <p style={{ color: 'red', fontSize: '14px', marginTop: '8px' }}>{error}</p>}
+          {success && <p style={{ color: '#10B981', fontSize: '14px', marginTop: '8px' }}>✅ {success}</p>}
         </div>
 
-        {/* TODAY'S SUMMARY */}
-        {todaySales.length > 0 && (
-          <div className="card" style={{ marginBottom: '24px', padding: '16px' }}>
-            <p className="card-label">Today's Total Sales</p>
-            <p className="card-value" style={{ color: '#10B981' }}>KES {todayTotal.toLocaleString()}</p>
-            <p style={{ fontSize: '12px', color: '#666' }}>{todaySales.length} transactions today</p>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+          <div className="card" style={{ flex: 1 }}>
+            <p className="card-label">Today's Profit</p>
+            <p className="card-value" style={{ color: todayProfit >= 0 ? '#10B981' : 'red' }}>KES {todayProfit.toLocaleString()}</p>
           </div>
-        )}
+          <div className="card" style={{ flex: 1 }}>
+            <p className="card-label">Total Profit (All Time)</p>
+            <p className="card-value" style={{ color: totalProfit >= 0 ? '#10B981' : 'red' }}>KES {totalProfit.toLocaleString()}</p>
+          </div>
+        </div>
 
         <div className="recent-sales">
-          <h3>All Sales ({sales.length})</h3>
+          <h3>Sales History</h3>
           {sales.length === 0 ? <p className="empty-state">No sales recorded yet.</p> : (
             <table>
               <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Qty Sold</th>
-                  <th>Price/Unit</th>
-                  <th>Total Earned</th>
-                  <th>Date</th>
-                  <th>Action</th>
-                </tr>
+                <tr><th>Product</th><th>Qty</th><th>Price/Unit</th><th>Cost/Unit</th><th>Revenue</th><th>Profit</th><th>Date</th><th></th></tr>
               </thead>
               <tbody>
                 {sales.map(s => (
                   <tr key={s.id}>
                     <td>{s.product}</td>
                     <td>{s.qty_sold}</td>
-                    <td>KES {s.price_per_unit.toLocaleString()}</td>
-                    <td style={{ color: '#10B981', fontWeight: 'bold' }}>KES {s.total_earned.toLocaleString()}</td>
+                    <td>KES {s.price_per_unit?.toLocaleString()}</td>
+                    <td style={{ color: '#aaa' }}>KES {s.cost_per_unit?.toLocaleString()}</td>
+                    <td>KES {s.total_earned?.toLocaleString()}</td>
+                    <td style={{ color: s.profit >= 0 ? '#10B981' : 'red', fontWeight: 'bold' }}>KES {s.profit?.toLocaleString()}</td>
                     <td>{s.date}</td>
                     <td><button className="delete-btn" onClick={() => deleteSale(s.id)}>🗑</button></td>
                   </tr>

@@ -12,6 +12,7 @@ export function Stock() {
   const [duration, setDuration] = useState('30')
   const [suggestedPrice, setSuggestedPrice] = useState('')
   const [stockType, setStockType] = useState('new')
+  
 
   function loadStock() {
     fetch(`http://127.0.0.1:5000/api/stock?user_id=${user.id}`)
@@ -177,6 +178,8 @@ export function Stock() {
                 />
               </div>
 
+              
+
               <div className="form-field">
                 <label>Suggested Selling Price (KES)</label>
 
@@ -192,6 +195,7 @@ export function Stock() {
             </>
           )}
 
+          
           <div className="form-field">
             <label>This stock is for</label>
 

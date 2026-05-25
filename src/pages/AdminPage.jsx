@@ -16,7 +16,16 @@ export function AdminPage() {
   function loadUsers() {
     fetch(`http://127.0.0.1:5000/api/admin/users/${user.id}`)
       .then(res => res.json())
-      .then(data => setUsers(data))
+      .then(data => {
+        // handle error response from server
+        if (Array.isArray(data)) {
+          setUsers(data)
+        } else {
+          setUsers([])
+          if (data.error) setError(data.error)
+        }
+      })
+      .catch(() => setUsers([]))
   }
 
   useEffect(() => {

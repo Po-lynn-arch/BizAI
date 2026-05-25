@@ -11,6 +11,10 @@ import { Stock } from './pages/Stock'
 import { SalesEntry } from './pages/SalesEntry'
 import { OperationalExpenses } from './pages/OperationalExpenses'
 import { ProtectedRoute } from './pages/ProtectedRoute'
+import { VerifyEmail } from './pages/VerifyEmail'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { ResetPassword } from './pages/ResetPassword'
+import { WeeklyReport } from './pages/WeeklyReport'
 
 export function App() {
   return (
@@ -26,6 +30,10 @@ export function App() {
         <Route path="/Stock" element={<ProtectedRoute><Stock /></ProtectedRoute>} />
         <Route path="/Sales" element={<ProtectedRoute><SalesEntry /></ProtectedRoute>} />
         <Route path="/Expenses" element={<ProtectedRoute><OperationalExpenses /></ProtectedRoute>} />
+        <Route path="/VerifyEmail" element={<ProtectedRoute><VerifyEmail/></ProtectedRoute>}/>
+        <Route path='/forgot-password' element={<ProtectedRoute><ForgotPassword/></ProtectedRoute>}></Route>
+        <Route path='/reset-password/:token' element={<ProtectedRoute><ResetPassword/></ProtectedRoute>}></Route>
+        <Route path="/WeeklyReport" element={<WeeklyReport />} />
       </Routes>
   )
 }

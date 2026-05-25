@@ -19,6 +19,7 @@ export function Sidebar() {
         <Link to="/Sales">📝 Record Sales</Link>
         <Link to="/Expenses">🏠 Expenses</Link>
         <Link to="/Reports">📄 Reports</Link>
+        <Link to="/WeeklyReport">📅 Weekly Report</Link>
         <Link to="/Predictions">🤖 Predictions</Link>
         <Link to="/Simulation">🧪 Simulation</Link>
         {user.role === 'admin' && <Link to="/Admin">⚙️ Admin</Link>}
