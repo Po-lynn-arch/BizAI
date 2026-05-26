@@ -43,7 +43,8 @@ def get_db():
         host=os.environ.get('DB_HOST', 'localhost'),
         user=os.environ.get('DB_USER', 'root'),
         password=os.environ.get('DB_PASSWORD', ''),
-        database=os.environ.get('DB_NAME', 'bizai')
+        database=os.environ.get('DB_NAME', 'bizai'),
+        port=int(os.environ.get('DB_PORT', 3306))
     )
 
 
@@ -51,96 +52,97 @@ def get_today():
     now = datetime.now()
     return f"{now.month}/{now.day}/{now.year}"
 
-
 def init_db():
-    conn = mysql.connector.connect(
-        host=os.environ.get('DB_HOST', 'localhost'),
-        user=os.environ.get('DB_USER', 'root'),
-        password=os.environ.get('DB_PASSWORD', '')
-    )
-    cursor = conn.cursor()
-    cursor.execute('CREATE DATABASE IF NOT EXISTS bizai')
-    cursor.execute('USE bizai')
+    try:
+        conn = mysql.connector.connect(
+            host=os.environ.get('DB_HOST', 'localhost'),
+            user=os.environ.get('DB_USER', 'root'),
+            password=os.environ.get('DB_PASSWORD', ''),
+            port=int(os.environ.get('DB_PORT', 3306))
+        )
+        cursor = conn.cursor()
+        db_name = os.environ.get('DB_NAME', 'bizai')
+        cursor.execute(f'CREATE DATABASE IF NOT EXISTS `{db_name}`')
+        cursor.execute(f'USE `{db_name}`')
 
-    cursor.execute('''CREATE TABLE IF NOT EXISTS businesses (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100),
-        code VARCHAR(20) UNIQUE
-    )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS businesses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100),
+            code VARCHAR(20) UNIQUE
+        )''')
 
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100),
-        email VARCHAR(100) UNIQUE,
-        password VARCHAR(255),
-        role VARCHAR(20) DEFAULT 'user',
-        business_id INT,
-        is_verified BOOLEAN DEFAULT FALSE,
-        failed_attempts INT DEFAULT 0,
-        locked_until DATETIME NULL,
-        FOREIGN KEY (business_id) REFERENCES businesses(id)
-    )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100),
+            email VARCHAR(100) UNIQUE,
+            password VARCHAR(255),
+            role VARCHAR(20) DEFAULT 'user',
+            business_id INT,
+            is_verified BOOLEAN DEFAULT TRUE,
+            failed_attempts INT DEFAULT 0,
+            locked_until DATETIME NULL,
+            FOREIGN KEY (business_id) REFERENCES businesses(id)
+        )''')
 
-    cursor.execute('''CREATE TABLE IF NOT EXISTS stock (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        product VARCHAR(100),
-        qty_bought INT,
-        cost_per_unit DECIMAL(10,2) DEFAULT 0,
-        total_cost DECIMAL(10,2) DEFAULT 0,
-        duration_days INT DEFAULT 30,
-        qty_remaining INT,
-        suggested_price DECIMAL(10,2) DEFAULT 0,
-        date_added VARCHAR(30),
-        stock_type VARCHAR(20) DEFAULT 'new'
-    )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS stock (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            product VARCHAR(100),
+            qty_bought INT,
+            cost_per_unit DECIMAL(10,2) DEFAULT 0,
+            total_cost DECIMAL(10,2) DEFAULT 0,
+            duration_days INT DEFAULT 30,
+            qty_remaining INT,
+            suggested_price DECIMAL(10,2) DEFAULT 0,
+            date_added VARCHAR(30),
+            stock_type VARCHAR(20) DEFAULT 'new'
+        )''')
 
-    cursor.execute('''CREATE TABLE IF NOT EXISTS sales (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        product VARCHAR(100),
-        qty_sold INT,
-        price_per_unit DECIMAL(10,2),
-        cost_per_unit DECIMAL(10,2) DEFAULT 0,
-        total_earned DECIMAL(10,2),
-        profit DECIMAL(10,2) DEFAULT 0,
-        date VARCHAR(30)
-    )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS sales (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            product VARCHAR(100),
+            qty_sold INT,
+            price_per_unit DECIMAL(10,2),
+            cost_per_unit DECIMAL(10,2) DEFAULT 0,
+            total_earned DECIMAL(10,2),
+            profit DECIMAL(10,2) DEFAULT 0,
+            date VARCHAR(30)
+        )''')
 
-    cursor.execute('''CREATE TABLE IF NOT EXISTS operational_expenses (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT,
-        item VARCHAR(100),
-        amount DECIMAL(10,2),
-        frequency VARCHAR(20),
-        is_fixed BOOLEAN DEFAULT FALSE,
-        date VARCHAR(30)
-    )''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS operational_expenses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT,
+            item VARCHAR(100),
+            amount DECIMAL(10,2),
+            frequency VARCHAR(20),
+            is_fixed BOOLEAN DEFAULT FALSE,
+            date VARCHAR(30)
+        )''')
 
-    # Migrate existing tables safely
-    migrations = [
-        ('users', 'is_verified', 'BOOLEAN DEFAULT FALSE'),
-        ('users', 'failed_attempts', 'INT DEFAULT 0'),
-        ('users', 'locked_until', 'DATETIME NULL'),
-        ('sales', 'cost_per_unit', 'DECIMAL(10,2) DEFAULT 0'),
-        ('sales', 'profit', 'DECIMAL(10,2) DEFAULT 0'),
-    ]
-    for table, column, definition in migrations:
-        try:
-            cursor.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
-        except Exception:
-            pass
+        migrations = [
+            ('users', 'is_verified', 'BOOLEAN DEFAULT TRUE'),
+            ('users', 'failed_attempts', 'INT DEFAULT 0'),
+            ('users', 'locked_until', 'DATETIME NULL'),
+            ('sales', 'cost_per_unit', 'DECIMAL(10,2) DEFAULT 0'),
+            ('sales', 'profit', 'DECIMAL(10,2) DEFAULT 0'),
+            ('stock', 'stock_type', "VARCHAR(20) DEFAULT 'new'"),
+        ]
+        for table, column, definition in migrations:
+            try:
+                cursor.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
+            except Exception:
+                pass
 
-    conn.commit()
-    conn.close()
-    print('[BizAI] Database ready')
+        conn.commit()
+        conn.close()
+        print('[BizAI] Database ready')
+
+    except Exception as e:
+        print(f'[BizAI] DB not connected: {e}')
 
 
-try:
-    init_db()
-    print('[BizAI] Database ready')
-except Exception as e:
-    print(f'[BizAI] DB not connected: {e}')
+init_db()
 
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────

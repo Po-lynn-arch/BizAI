@@ -1,8 +1,10 @@
 flask
 flask-cors
-flask-mail
 flask-limiter
+flask-mail
 flask-jwt-extended
 mysql-connector-python
 werkzeug
 itsdangerous
+gunicorn
+python-dotenv
