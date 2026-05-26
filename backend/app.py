@@ -182,7 +182,7 @@ def register():
         )
         conn.commit()
 
-        # Send verification email — non-blocking
+        # send verification email — non-blocking
         try:
             token = serializer.dumps(email, salt='verify-email')
             link = f"{FRONTEND_URL}/verify-email/{token}"
@@ -193,11 +193,14 @@ def register():
                 body=f"Hi {name},\n\nClick the link below to verify your email:\n{link}\n\nLink expires in 24 hours.\n\nBizAI Team"
             )
             mail.send(msg)
-            print(f'[BizAI] Verification email sent to {email}')
+            print(f'Verification email sent to {email}')
         except Exception as e:
-            print(f'[BizAI] Email not sent (non-blocking): {e}')
+            print(f'Email not sent (non-blocking): {e}')
 
-        return jsonify({'message': 'Account created! Check your email to verify.', 'business_code': code}), 201
+        return jsonify({
+            'message': 'Account created! Check your email to verify.',
+            'business_code': code
+        }), 201
 
     except mysql.connector.IntegrityError:
         return jsonify({'error': 'Email already exists'}), 400
@@ -206,7 +209,6 @@ def register():
             conn.close()
         except Exception:
             pass
-
 
 @app.route('/api/verify-email/<token>')
 def verify_email(token):
