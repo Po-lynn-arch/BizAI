@@ -136,7 +136,11 @@ def init_db():
     print('[BizAI] Database ready')
 
 
-init_db()
+try:
+    init_db()
+    print('[BizAI] Database ready')
+except Exception as e:
+    print(f'[BizAI] DB not connected: {e}')
 
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
@@ -827,7 +831,6 @@ def simulate():
 @app.route('/api/test', methods=['GET'])
 def test():
     return jsonify({'message': 'BizAI backend is running!'})
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
