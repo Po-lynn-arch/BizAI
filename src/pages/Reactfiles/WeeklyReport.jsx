@@ -11,7 +11,7 @@ export function WeeklyReport() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/weekly-report?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/weekly-report?user_id=${user.id}`)
       .then(res => res.json())
       .then(data => { setReport(data); setLoading(false) })
       .catch(() => setLoading(false))

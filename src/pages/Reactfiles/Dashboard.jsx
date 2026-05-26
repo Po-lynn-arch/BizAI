@@ -12,9 +12,9 @@ export function Dashboard() {
   const [reminders, setReminders] = useState([])
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/sales?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`)
       .then(res => res.json()).then(setSales)
-    fetch(`http://127.0.0.1:5000/api/reminders?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/reminders?user_id=${user.id}`)
       .then(res => res.json()).then(setReminders)
   }, [])
 

@@ -9,7 +9,7 @@ export function Predictions() {
   const [predictions, setPredictions] = useState([])
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/predictions?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/predictions?user_id=${user.id}`)
       .then(res => res.json())
       .then(data => setPredictions(data))
   }, [])

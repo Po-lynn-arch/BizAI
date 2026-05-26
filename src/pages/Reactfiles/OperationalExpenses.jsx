@@ -11,7 +11,7 @@ export function OperationalExpenses() {
   const [isFixed, setIsFixed] = useState(false)
 
   function loadExpenses() {
-    fetch(`http://127.0.0.1:5000/api/operational-expenses?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/operational-expenses?user_id=${user.id}`)
       .then(res => res.json()).then(d => setData(d))
   }
 
@@ -21,7 +21,7 @@ export function OperationalExpenses() {
     if (!item || !amount) { alert('Please fill in all fields'); return }
     if (Number(amount) <= 0) { alert('Amount must be greater than zero'); return }
 
-    await fetch('http://127.0.0.1:5000/api/operational-expenses', {
+    await fetch('https://bizai-backend-z4dh.onrender.com/api/operational-expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
      body: JSON.stringify({
@@ -38,7 +38,7 @@ export function OperationalExpenses() {
   }
 
   async function deleteExpense(id) {
-    await fetch(`http://127.0.0.1:5000/api/operational-expenses/${id}`, { method: 'DELETE' })
+    await fetch(`https://bizai-backend-z4dh.onrender.com/api/operational-expenses/${id}`, { method: 'DELETE' })
     loadExpenses()
   }
 

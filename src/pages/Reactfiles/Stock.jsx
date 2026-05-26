@@ -15,7 +15,7 @@ export function Stock() {
   
 
   function loadStock() {
-    fetch(`http://127.0.0.1:5000/api/stock?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/stock?user_id=${user.id}`)
       .then(res => res.json())
       .then(data => setStock(data))
       .catch(err => console.error('Failed to load stock:', err))
@@ -38,7 +38,7 @@ export function Stock() {
     }
 
     try {
-      await fetch('http://127.0.0.1:5000/api/stock', {
+      await fetch('https://bizai-backend-z4dh.onrender.com/api/stock', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

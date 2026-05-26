@@ -17,9 +17,9 @@ export function SalesEntry() {
   const [entries, setEntries] = useState([{ qty_sold: '', price_per_unit: '' }])
 
   function loadData() {
-    fetch(`http://127.0.0.1:5000/api/sales?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`)
       .then(res => res.json()).then(setSales)
-    fetch(`http://127.0.0.1:5000/api/stock?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/stock?user_id=${user.id}`)
       .then(res => res.json()).then(setStock)
   }
 
@@ -59,7 +59,7 @@ export function SalesEntry() {
   async function recordSingleSale() {
     setError(''); setSuccess('')
     if (!product || !qty || !price) { setError('Fill all fields'); return }
-    const res = await fetch('http://127.0.0.1:5000/api/sales', {
+    const res = await fetch('https://bizai-backend-z4dh.onrender.com/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -83,7 +83,7 @@ export function SalesEntry() {
     if (!product) { setError('Select a product'); return }
     const validEntries = entries.filter(e => Number(e.qty_sold) > 0 && Number(e.price_per_unit) > 0)
     if (validEntries.length === 0) { setError('Add at least one entry with qty and price'); return }
-    const res = await fetch('http://127.0.0.1:5000/api/sales', {
+    const res = await fetch('https://bizai-backend-z4dh.onrender.com/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -103,7 +103,7 @@ export function SalesEntry() {
   }
 
   async function deleteSale(id) {
-    await fetch(`http://127.0.0.1:5000/api/sales/${id}`, { method: 'DELETE' })
+    await fetch(`https://bizai-backend-z4dh.onrender.com/api/sales/${id}`, { method: 'DELETE' })
     loadData()
   }
 

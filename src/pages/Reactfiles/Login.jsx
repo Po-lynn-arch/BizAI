@@ -30,7 +30,7 @@ export function Login() {
 
     try {
       const response = await fetch(
-        'http://127.0.0.1:5000/api/login',
+        'https://bizai-backend-z4dh.onrender.com/api/login',
         {
           method: 'POST',
           headers: {
@@ -77,7 +77,7 @@ export function Login() {
   async function resendVerification() {
     try {
       const res = await fetch(
-        'http://127.0.0.1:5000/api/resend-verification',
+        'https://bizai-backend-z4dh.onrender.com/api/resend-verification',
         {
           method: 'POST',
           headers: {

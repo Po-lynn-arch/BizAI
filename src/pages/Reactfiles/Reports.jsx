@@ -9,8 +9,8 @@ export function Reports() {
   const [expenses, setExpenses] = useState([])
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/sales?user_id=${user.id}`).then(res => res.json()).then(setSales)
-    fetch(`http://127.0.0.1:5000/api/operational-expenses?user_id=${user.id}`).then(res => res.json()).then(setExpenses)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`).then(res => res.json()).then(setSales)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/operational-expenses?user_id=${user.id}`).then(res => res.json()).then(setExpenses)
   }, [])
 
   const today = new Date().toLocaleDateString()

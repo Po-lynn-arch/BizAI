@@ -14,7 +14,7 @@ export function AdminPage() {
   const [success, setSuccess] = useState('')
 
   function loadUsers() {
-    fetch(`http://127.0.0.1:5000/api/admin/users/${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/admin/users/${user.id}`)
       .then(res => res.json())
       .then(data => {
         // handle error response from server
@@ -35,7 +35,7 @@ export function AdminPage() {
 
   async function addUser() {
     if (!name || !email || !password) { setError('Please fill in all fields'); return }
-    const response = await fetch('http://127.0.0.1:5000/api/admin/add-user', {
+    const response = await fetch('https://bizai-backend-z4dh.onrender.com/api/admin/add-user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ admin_id: user.id, name, email, password })
@@ -53,7 +53,7 @@ export function AdminPage() {
   }
 
   async function removeUser(userId) {
-    await fetch(`http://127.0.0.1:5000/api/admin/users/${userId}`, {
+    await fetch(`https://bizai-backend-z4dh.onrender.com/api/admin/users/${userId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ admin_id: user.id })

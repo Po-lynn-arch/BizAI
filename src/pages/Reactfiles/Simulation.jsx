@@ -16,7 +16,7 @@ export function Simulation() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/sales?user_id=${user.id}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`)
     .then(res => res.json()).then(d => setIncome(d))
   }, [])
 
@@ -32,7 +32,7 @@ export function Simulation() {
     setMessages(prev => [...prev, { from: 'user', text: userMsg }])
     setLoading(true)
 
-    const response = await fetch('http://127.0.0.1:5000/api/simulate', {
+    const response = await fetch('https://bizai-backend-z4dh.onrender.com/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

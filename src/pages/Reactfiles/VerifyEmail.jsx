@@ -9,7 +9,7 @@ export function VerifyEmail() {
   const [success, setSuccess] = useState(null)
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/verify-email/${token}`)
+    fetch(`https://bizai-backend-z4dh.onrender.com/api/verify-email/${token}`)
       .then(res => res.json())
       .then(data => {
         if (data.message) {
