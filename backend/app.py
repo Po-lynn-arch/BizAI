@@ -156,7 +156,6 @@ threading.Thread(target=init_db, daemon=True).start()
 
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
-
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -178,24 +177,27 @@ def register():
         business_id = cursor.lastrowid
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
-            (name, email, generate_password_hash(password), 'admin', business_id, False)
+            (name, email, generate_password_hash(password), 'admin', business_id, True)
         )
         conn.commit()
 
-        # send verification email — non-blocking
-        try:
-            token = serializer.dumps(email, salt='verify-email')
-            link = f"{FRONTEND_URL}/verify-email/{token}"
-            msg = Message(
-                'Verify your BizAI account',
-                sender=app.config['MAIL_USERNAME'],
-                recipients=[email],
-                body=f"Hi {name},\n\nClick the link below to verify your email:\n{link}\n\nLink expires in 24 hours.\n\nBizAI Team"
-            )
-            mail.send(msg)
-            print(f'Verification email sent to {email}')
-        except Exception as e:
-            print(f'Email not sent (non-blocking): {e}')
+        def send_verification_email():
+            try:
+                token = serializer.dumps(email, salt='verify-email')
+                link = f"{FRONTEND_URL}/verify-email/{token}"
+                msg = Message(
+                    'Verify your BizAI account',
+                    sender=app.config['MAIL_USERNAME'],
+                    recipients=[email],
+                    body=f"Hi {name},\n\nClick the link below to verify your email:\n{link}\n\nLink expires in 24 hours.\n\nBizAI Team"
+                )
+                with app.app_context():
+                    mail.send(msg)
+                print(f'Verification email sent to {email}')
+            except Exception as e:
+                print(f'Email not sent: {e}')
+
+        threading.Thread(target=send_verification_email, daemon=True).start()
 
         return jsonify({
             'message': 'Account created! Check your email to verify.',
