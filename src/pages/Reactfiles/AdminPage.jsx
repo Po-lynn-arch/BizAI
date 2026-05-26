@@ -2,6 +2,7 @@ import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from '../../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
 export function AdminPage() {
   const navigate = useNavigate()

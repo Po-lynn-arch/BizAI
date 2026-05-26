@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
+import { API_URL } from '../../hooks/config'
 
 export function Dashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

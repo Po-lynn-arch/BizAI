@@ -2,6 +2,7 @@ import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
 export function Reports() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

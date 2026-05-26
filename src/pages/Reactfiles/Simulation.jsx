@@ -2,6 +2,7 @@ import '../CSS/Dashboard.css'
 import '../CSS/Simulation.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
 export function Simulation() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

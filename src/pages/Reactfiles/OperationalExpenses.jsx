@@ -1,6 +1,7 @@
 import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
 export function OperationalExpenses() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

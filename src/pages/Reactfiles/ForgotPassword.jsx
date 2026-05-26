@@ -1,6 +1,7 @@
 import '../CSS/Authentication.css'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { API_URL } from '../../hooks/config'
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('')

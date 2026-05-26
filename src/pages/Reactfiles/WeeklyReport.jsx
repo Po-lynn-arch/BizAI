@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend
 } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
 export function WeeklyReport() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

@@ -3,6 +3,7 @@ import '../CSS/Predictions.css'
 import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
 export function Predictions() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

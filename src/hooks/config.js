@@ -1,0 +1,1 @@
+export const API_URL = 'https://bizai-backend-z4dh.onrender.com'
