@@ -43,7 +43,7 @@ def get_db():
         host=os.environ.get('DB_HOST', 'localhost'),
         user=os.environ.get('DB_USER', 'root'),
         password=os.environ.get('DB_PASSWORD', ''),
-        database='bizai'
+        database=os.environ.get('DB_NAME', 'bizai')
     )
 
 
