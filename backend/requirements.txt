@@ -1,0 +1,8 @@
+flask
+flask-cors
+flask-mail
+flask-limiter
+flask-jwt-extended
+mysql-connector-python
+werkzeug
+itsdangerous
