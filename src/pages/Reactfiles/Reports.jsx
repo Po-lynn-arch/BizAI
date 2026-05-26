@@ -1,7 +1,7 @@
-import './Dashboard.css'
+import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar } from '../../components/Sidebar'
 
 export function Reports() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

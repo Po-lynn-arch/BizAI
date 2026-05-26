@@ -1,6 +1,6 @@
-import './DataEntry.css'
+import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar } from '../../components/Sidebar'
 
 export function OperationalExpenses() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

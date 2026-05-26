@@ -10,19 +10,21 @@ import random, string, os
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
+CORS(app)
 
+# ── CONFIG ────────────────────────────────────────────────────────────────────
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod')
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_USERNAME')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', '')
 
 mail = Mail(app)
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 MAX_ATTEMPTS = 5
@@ -30,14 +32,10 @@ LOCK_MINUTES = 10
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 
+# ── HELPERS ───────────────────────────────────────────────────────────────────
+
 def generate_code():
     return 'BIZAI-' + ''.join(random.choices(string.digits, k=4))
-
-
-def get_today():
-    # Windows-compatible date format matching JS toLocaleDateString()
-    now = datetime.now()
-    return f"{now.month}/{now.day}/{now.year}"
 
 
 def get_db():
@@ -47,6 +45,11 @@ def get_db():
         password=os.environ.get('DB_PASSWORD', ''),
         database='bizai'
     )
+
+
+def get_today():
+    now = datetime.now()
+    return f"{now.month}/{now.day}/{now.year}"
 
 
 def init_db():
@@ -65,7 +68,6 @@ def init_db():
         code VARCHAR(20) UNIQUE
     )''')
 
-    # SINGLE users table with all columns including is_verified
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100),
@@ -93,7 +95,6 @@ def init_db():
         stock_type VARCHAR(20) DEFAULT 'new'
     )''')
 
-    # sales stores profit per row = (selling_price - cost_per_unit) * qty
     cursor.execute('''CREATE TABLE IF NOT EXISTS sales (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT,
@@ -116,16 +117,29 @@ def init_db():
         date VARCHAR(30)
     )''')
 
+    # Migrate existing tables safely
+    migrations = [
+        ('users', 'is_verified', 'BOOLEAN DEFAULT FALSE'),
+        ('users', 'failed_attempts', 'INT DEFAULT 0'),
+        ('users', 'locked_until', 'DATETIME NULL'),
+        ('sales', 'cost_per_unit', 'DECIMAL(10,2) DEFAULT 0'),
+        ('sales', 'profit', 'DECIMAL(10,2) DEFAULT 0'),
+    ]
+    for table, column, definition in migrations:
+        try:
+            cursor.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
+        except Exception:
+            pass
+
     conn.commit()
     conn.close()
+    print('[BizAI] Database ready')
 
 
 init_db()
 
 
-# ========================
-# AUTH
-# ========================
+# ── AUTH ──────────────────────────────────────────────────────────────────────
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -137,7 +151,6 @@ def register():
 
     if not all([name, email, password, business_name]):
         return jsonify({'error': 'All fields required'}), 400
-
     if len(password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
 
@@ -153,7 +166,7 @@ def register():
         )
         conn.commit()
 
-        # send verification email — fails silently if Gmail not configured
+        # Send verification email — non-blocking
         try:
             token = serializer.dumps(email, salt='verify-email')
             link = f"{FRONTEND_URL}/verify-email/{token}"
@@ -164,17 +177,13 @@ def register():
                 body=f"Hi {name},\n\nClick the link below to verify your email:\n{link}\n\nLink expires in 24 hours.\n\nBizAI Team"
             )
             mail.send(msg)
-            print(f'Verification email sent to {email}')
+            print(f'[BizAI] Verification email sent to {email}')
         except Exception as e:
-            print(f'Email not sent (non-blocking): {e}')
+            print(f'[BizAI] Email not sent (non-blocking): {e}')
 
-        return jsonify({
-            'message': 'Account created successfully!',
-            'business_code': code
-        }), 201
+        return jsonify({'message': 'Account created! Check your email to verify.', 'business_code': code}), 201
 
     except mysql.connector.IntegrityError:
-        conn.close()
         return jsonify({'error': 'Email already exists'}), 400
     finally:
         try:
@@ -211,18 +220,18 @@ def resend_verification():
         return jsonify({'message': 'Already verified'}), 200
     try:
         token = serializer.dumps(email, salt='verify-email')
-        link = f"{FRONTEND_URL}/reset-password/{token}"
+        link = f"{FRONTEND_URL}/verify-email/{token}"
         msg = Message(
             'Verify your BizAI account',
             sender=app.config['MAIL_USERNAME'],
             recipients=[email],
-            body=f"Hi {user[0]},\n\nVerify your email:\n{link}\n\nBizAI Team"
+            body=f"Hi {user[0]},\n\nVerify your email here:\n{link}\n\nBizAI Team"
         )
         mail.send(msg)
         return jsonify({'message': 'Verification email sent'})
     except Exception as e:
-        print(f'Resend email failed: {e}')
-        return jsonify({'error': 'Failed to send email. Please configure Gmail App Password.'}), 500
+        print(f'[BizAI] Resend email failed: {e}')
+        return jsonify({'error': 'Failed to send email'}), 500
 
 
 @app.route('/api/login', methods=['POST'])
@@ -253,16 +262,14 @@ def login():
 
     if not user[6]:
         conn.close()
-        return jsonify({'error': 'Please verify your email before logging in. Check your inbox.'}), 403
+        return jsonify({'error': 'Verify email first'}), 403
 
     if not check_password_hash(user[3], password):
         new_attempts = user[7] + 1
         if new_attempts >= MAX_ATTEMPTS:
             lock_time = datetime.now() + timedelta(minutes=LOCK_MINUTES)
-            cursor.execute(
-                'UPDATE users SET failed_attempts=%s, locked_until=%s WHERE email=%s',
-                (new_attempts, lock_time, email)
-            )
+            cursor.execute('UPDATE users SET failed_attempts=%s, locked_until=%s WHERE email=%s',
+                           (new_attempts, lock_time, email))
         else:
             cursor.execute('UPDATE users SET failed_attempts=%s WHERE email=%s', (new_attempts, email))
         conn.commit()
@@ -275,16 +282,9 @@ def login():
     cursor.execute('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE email=%s', (email,))
     conn.commit()
     conn.close()
-
     return jsonify({
         'message': 'Login successful',
-        'user': {
-            'id': user[0],
-            'name': user[1],
-            'email': user[2],
-            'role': user[4],
-            'business_id': user[5]
-        }
+        'user': {'id': user[0], 'name': user[1], 'email': user[2], 'role': user[4], 'business_id': user[5]}
     })
 
 
@@ -306,12 +306,12 @@ def forgot_password():
                 'Reset your BizAI password',
                 sender=app.config['MAIL_USERNAME'],
                 recipients=[email],
-                body=f"Hi {user[0]},\n\nClick to reset your password:\n{link}\n\nExpires in 1 hour.\n\nBizAI Team"
+                body=f"Hi {user[0]},\n\nClick to reset your password:\n{link}\n\nExpires in 1 hour.\n\nIf you didn't request this, ignore this email.\n\nBizAI Team"
             )
             mail.send(msg)
         except Exception as e:
-            print(f'Forgot password email failed: {e}')
-            return jsonify({'error': 'Failed to send email. Please configure Gmail App Password.'}), 500
+            print(f'[BizAI] Forgot password email failed: {e}')
+            return jsonify({'error': 'Failed to send email'}), 500
     return jsonify({'message': 'If that email exists, a reset link has been sent.'})
 
 
@@ -326,10 +326,8 @@ def reset_password(token):
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(
-        'UPDATE users SET password=%s, failed_attempts=0, locked_until=NULL WHERE email=%s',
-        (generate_password_hash(new_password), email)
-    )
+    cursor.execute('UPDATE users SET password=%s, failed_attempts=0, locked_until=NULL WHERE email=%s',
+                   (generate_password_hash(new_password), email))
     conn.commit()
     conn.close()
     return jsonify({'message': 'Password reset successful!'})
@@ -342,30 +340,26 @@ def join_business():
     email = data.get('email', '').strip()
     password = data.get('password', '')
     code = data.get('code', '').strip().upper()
-
     if not all([name, email, password, code]):
         return jsonify({'error': 'All fields are required'}), 400
     if len(password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
-
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT id FROM businesses WHERE code=%s', (code,))
     business = cursor.fetchone()
     if not business:
         conn.close()
-        return jsonify({'error': 'Invalid business code. Check with your business owner.'}), 404
-
+        return jsonify({'error': 'Invalid business code'}), 404
     business_id = business[0]
     cursor.execute('SELECT COUNT(*) FROM users WHERE business_id=%s', (business_id,))
     if cursor.fetchone()[0] >= 2:
         conn.close()
         return jsonify({'error': 'This business already has the maximum of 2 users'}), 400
-
     try:
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
-            (name, email, generate_password_hash(password), 'user', business_id, False)
+            (name, email, generate_password_hash(password), 'user', business_id, True)
         )
         conn.commit()
         conn.close()
@@ -375,9 +369,7 @@ def join_business():
         return jsonify({'error': 'Email already exists'}), 400
 
 
-# ========================
-# ADMIN
-# ========================
+# ── ADMIN ─────────────────────────────────────────────────────────────────────
 
 @app.route('/api/admin/add-user', methods=['POST'])
 def add_user():
@@ -397,7 +389,7 @@ def add_user():
     try:
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
-            (data['name'], data['email'], generate_password_hash(data['password']), 'user', business_id, False)
+            (data['name'], data['email'], generate_password_hash(data['password']), 'user', business_id, True)
         )
         conn.commit()
         conn.close()
@@ -438,9 +430,7 @@ def delete_user(user_id):
     return jsonify({'message': 'User deleted'})
 
 
-# ========================
-# STOCK
-# ========================
+# ── STOCK ─────────────────────────────────────────────────────────────────────
 
 @app.route('/api/stock', methods=['POST'])
 def add_stock():
@@ -450,12 +440,10 @@ def add_stock():
     duration = int(data.get('duration_days', 30))
     suggested_price = float(data.get('suggested_price', 0))
     stock_type = data.get('stock_type', 'new')
-
     if qty <= 0:
         return jsonify({'error': 'Quantity must be greater than zero'}), 400
     if stock_type == 'new' and cost <= 0:
         return jsonify({'error': 'Cost must be greater than zero for new stock'}), 400
-
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
@@ -463,24 +451,18 @@ def add_stock():
         (data['user_id'], data['product'])
     )
     existing = cursor.fetchone()
-
     if existing:
         cursor.execute(
             'UPDATE stock SET qty_remaining=%s, qty_bought=qty_bought+%s, total_cost=total_cost+%s, cost_per_unit=%s WHERE id=%s',
-            (existing[1] + qty, qty,
-             qty * cost if stock_type == 'new' else 0,
-             cost if stock_type == 'new' else 0,
-             existing[0])
+            (existing[1] + qty, qty, qty * cost if stock_type == 'new' else 0,
+             cost if stock_type == 'new' else 0, existing[0])
         )
     else:
         cursor.execute(
             'INSERT INTO stock (user_id,product,qty_bought,cost_per_unit,total_cost,duration_days,qty_remaining,suggested_price,date_added,stock_type) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
-            (data['user_id'], data['product'], qty,
-             cost if stock_type == 'new' else 0,
-             qty * cost if stock_type == 'new' else 0,
-             duration, qty, suggested_price, data['date'], stock_type)
+            (data['user_id'], data['product'], qty, cost if stock_type == 'new' else 0,
+             qty * cost if stock_type == 'new' else 0, duration, qty, suggested_price, data['date'], stock_type)
         )
-
     conn.commit()
     conn.close()
     return jsonify({'message': 'Stock added successfully'}), 201
@@ -505,9 +487,7 @@ def get_stock():
     } for r in rows])
 
 
-# ========================
-# SALES
-# ========================
+# ── SALES ─────────────────────────────────────────────────────────────────────
 
 @app.route('/api/sales', methods=['POST'])
 def add_sale():
@@ -515,11 +495,10 @@ def add_sale():
     user_id = data.get('user_id')
     product = data.get('product')
     sale_date = data.get('date')
-    entries = data.get('entries')  # list for multi-price sales
+    entries = data.get('entries')
 
     conn = get_db()
     cursor = conn.cursor()
-
     cursor.execute(
         'SELECT id,qty_remaining,cost_per_unit FROM stock WHERE user_id=%s AND product=%s ORDER BY id DESC LIMIT 1',
         (user_id, product)
@@ -532,7 +511,6 @@ def add_sale():
     stock_id, qty_remaining, cost_per_unit = stock[0], int(stock[1]), float(stock[2])
 
     if entries:
-        # multi-price sale (boutique use case)
         total_qty = sum(int(e.get('qty_sold', 0)) for e in entries if int(e.get('qty_sold', 0)) > 0)
         if qty_remaining < total_qty:
             conn.close()
@@ -549,7 +527,6 @@ def add_sale():
             )
         cursor.execute('UPDATE stock SET qty_remaining=qty_remaining-%s WHERE id=%s', (total_qty, stock_id))
     else:
-        # single price sale
         qty_sold = int(data.get('qty_sold', 0))
         price = float(data.get('price_per_unit', 0))
         if qty_sold <= 0 or price <= 0:
@@ -605,9 +582,7 @@ def delete_sale(id):
     return jsonify({'message': 'Sale deleted and stock restored'})
 
 
-# ========================
-# OPERATIONAL EXPENSES
-# ========================
+# ── OPERATIONAL EXPENSES ──────────────────────────────────────────────────────
 
 @app.route('/api/operational-expenses', methods=['POST'])
 def add_operational_expense():
@@ -619,9 +594,7 @@ def add_operational_expense():
     cursor = conn.cursor()
     cursor.execute(
         'INSERT INTO operational_expenses (user_id,item,amount,frequency,is_fixed,date) VALUES (%s,%s,%s,%s,%s,%s)',
-        (data['user_id'], data['item'], amount,
-         data.get('frequency', 'monthly'),
-         data.get('is_fixed', False), data['date'])
+        (data['user_id'], data['item'], amount, data.get('frequency', 'monthly'), data.get('is_fixed', False), data['date'])
     )
     conn.commit()
     conn.close()
@@ -641,8 +614,7 @@ def get_operational_expenses():
     conn.close()
     return jsonify([{
         'id': r[0], 'user_id': r[1], 'item': r[2],
-        'amount': float(r[3]), 'frequency': r[4],
-        'date': r[5], 'is_fixed': bool(r[6])
+        'amount': float(r[3]), 'frequency': r[4], 'date': r[5], 'is_fixed': bool(r[6])
     } for r in rows])
 
 
@@ -662,8 +634,7 @@ def get_reminders():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT item,amount,frequency FROM operational_expenses WHERE user_id=%s AND is_fixed=TRUE',
-        (user_id,)
+        'SELECT item,amount,frequency FROM operational_expenses WHERE user_id=%s AND is_fixed=TRUE', (user_id,)
     )
     rows = cursor.fetchall()
     conn.close()
@@ -673,9 +644,7 @@ def get_reminders():
     } for r in rows])
 
 
-# ========================
-# SUMMARY
-# ========================
+# ── SUMMARY ───────────────────────────────────────────────────────────────────
 
 @app.route('/api/summary', methods=['GET'])
 def get_summary():
@@ -683,40 +652,27 @@ def get_summary():
     conn = get_db()
     cursor = conn.cursor()
 
-    # profit is stored per sale row — just sum it up
-    cursor.execute(
-        'SELECT SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s',
-        (user_id,)
-    )
+    cursor.execute('SELECT SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s', (user_id,))
     row = cursor.fetchone()
     total_income = float(row[0] or 0)
     total_profit = float(row[1] or 0)
     total_transactions = int(row[2] or 0)
 
     today = get_today()
-    cursor.execute(
-        'SELECT SUM(total_earned), SUM(profit) FROM sales WHERE user_id=%s AND date=%s',
-        (user_id, today)
-    )
+    cursor.execute('SELECT SUM(total_earned), SUM(profit) FROM sales WHERE user_id=%s AND date=%s', (user_id, today))
     row = cursor.fetchone()
     today_income = float(row[0] or 0)
     today_profit = float(row[1] or 0)
 
-    cursor.execute(
-        'SELECT amount,frequency FROM operational_expenses WHERE user_id=%s',
-        (user_id,)
-    )
+    cursor.execute('SELECT amount,frequency FROM operational_expenses WHERE user_id=%s', (user_id,))
     ops = cursor.fetchall()
     total_operational = sum(float(r[0]) for r in ops)
     daily_operational = 0
     for r in ops:
         amt, freq = float(r[0]), r[1]
-        if freq == 'daily':
-            daily_operational += amt
-        elif freq == 'weekly':
-            daily_operational += amt / 7
-        else:
-            daily_operational += amt / 30
+        if freq == 'daily': daily_operational += amt
+        elif freq == 'weekly': daily_operational += amt / 7
+        else: daily_operational += amt / 30
 
     conn.close()
     return jsonify({
@@ -724,15 +680,13 @@ def get_summary():
         'total_profit': round(total_profit, 2),
         'total_operational': round(total_operational, 2),
         'today_income': round(today_income, 2),
-        'today_profit': round(today_profit - daily_operational, 2),
+        'today_profit': round(today_profit, 2),
         'daily_operational': round(daily_operational, 2),
         'total_transactions': total_transactions
     })
 
 
-# ========================
-# WEEKLY REPORT
-# ========================
+# ── WEEKLY REPORT ─────────────────────────────────────────────────────────────
 
 @app.route('/api/weekly-report', methods=['GET'])
 def weekly_report():
@@ -740,7 +694,6 @@ def weekly_report():
     conn = get_db()
     cursor = conn.cursor()
 
-    # build last 7 days using Windows-compatible format
     days = []
     for i in range(6, -1, -1):
         d = datetime.now() - timedelta(days=i)
@@ -753,24 +706,14 @@ def weekly_report():
             (user_id, day)
         )
         r = cursor.fetchone()
-        daily.append({
-            'date': day,
-            'revenue': float(r[0] or 0),
-            'profit': float(r[1] or 0),
-            'transactions': int(r[2] or 0)
-        })
+        daily.append({'date': day, 'revenue': float(r[0] or 0), 'profit': float(r[1] or 0), 'transactions': int(r[2] or 0)})
 
     placeholders = ','.join(['%s'] * len(days))
     cursor.execute(
         f'SELECT product, SUM(total_earned), SUM(profit), SUM(qty_sold) FROM sales WHERE user_id=%s AND date IN ({placeholders}) GROUP BY product ORDER BY SUM(total_earned) DESC LIMIT 5',
         [user_id] + days
     )
-    top_products = [{
-        'product': r[0],
-        'revenue': float(r[1]),
-        'profit': float(r[2]),
-        'qty': int(r[3])
-    } for r in cursor.fetchall()]
+    top_products = [{'product': r[0], 'revenue': float(r[1]), 'profit': float(r[2]), 'qty': int(r[3])} for r in cursor.fetchall()]
 
     cursor.execute(
         f'SELECT SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s AND date IN ({placeholders})',
@@ -778,7 +721,6 @@ def weekly_report():
     )
     t = cursor.fetchone()
     conn.close()
-
     return jsonify({
         'daily': daily,
         'top_products': top_products,
@@ -788,40 +730,29 @@ def weekly_report():
     })
 
 
-# ========================
-# ALERTS
-# ========================
+# ── ALERTS ────────────────────────────────────────────────────────────────────
 
 @app.route('/api/alerts', methods=['GET'])
 def get_alerts():
     user_id = request.args.get('user_id')
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(
-        'SELECT product,qty_bought,qty_remaining,duration_days FROM stock WHERE user_id=%s',
-        (user_id,)
-    )
+    cursor.execute('SELECT product,qty_bought,qty_remaining,duration_days FROM stock WHERE user_id=%s', (user_id,))
     stock_rows = cursor.fetchall()
     alerts = []
     for row in stock_rows:
         product, qty_bought, qty_remaining, duration_days = row[0], int(row[1]), int(row[2]), int(row[3])
-        cursor.execute(
-            'SELECT SUM(qty_sold) FROM sales WHERE user_id=%s AND product=%s',
-            (user_id, product)
-        )
+        cursor.execute('SELECT SUM(qty_sold) FROM sales WHERE user_id=%s AND product=%s', (user_id, product))
         total_sold = int((cursor.fetchone()[0]) or 0)
         percent_remaining = (qty_remaining / qty_bought * 100) if qty_bought > 0 else 0
         avg_daily = total_sold / duration_days if total_sold > 0 else 0
         days_remaining = round(qty_remaining / avg_daily) if avg_daily > 0 else duration_days
         if percent_remaining <= 10:
-            level = 'red'
-            message = f'Only {qty_remaining} units left ({percent_remaining:.0f}%) — restock urgently!'
+            level, message = 'red', f'Only {qty_remaining} units left ({percent_remaining:.0f}%) — restock urgently!'
         elif percent_remaining <= 30:
-            level = 'orange'
-            message = f'{qty_remaining} units left — consider restocking (~{days_remaining} days left)'
+            level, message = 'orange', f'{qty_remaining} units left — consider restocking (~{days_remaining} days left)'
         else:
-            level = 'green'
-            message = f'{qty_remaining} units left — stock is healthy (~{days_remaining} days left)'
+            level, message = 'green', f'{qty_remaining} units left — stock is healthy (~{days_remaining} days left)'
         alerts.append({
             'product': product, 'qty_bought': qty_bought, 'qty_remaining': qty_remaining,
             'percent_remaining': round(percent_remaining, 1), 'days_remaining': days_remaining,
@@ -831,9 +762,7 @@ def get_alerts():
     return jsonify(alerts)
 
 
-# ========================
-# PREDICTIONS
-# ========================
+# ── PREDICTIONS ───────────────────────────────────────────────────────────────
 
 @app.route('/api/predictions', methods=['GET'])
 def get_predictions_route():
@@ -845,7 +774,6 @@ def get_predictions_route():
         predictions = get_predictions(user_id)
     except Exception:
         predictions = None
-
     if not predictions:
         conn = get_db()
         cursor = conn.cursor()
@@ -855,20 +783,12 @@ def get_predictions_route():
         )
         rows = cursor.fetchall()
         conn.close()
-        predictions = [{
-            'product': r[0],
-            'revenue': float(r[1]),
-            'total_qty': 0,
-            'prediction': 'High demand expected next month',
-            'confidence': 'N/A'
-        } for r in rows]
-
+        predictions = [{'product': r[0], 'revenue': float(r[1]), 'total_qty': 0,
+                        'prediction': 'High demand expected next month', 'confidence': 'N/A'} for r in rows]
     return jsonify(predictions)
 
 
-# ========================
-# SIMULATION
-# ========================
+# ── SIMULATION ────────────────────────────────────────────────────────────────
 
 @app.route('/api/simulate', methods=['POST'])
 def simulate():
@@ -877,21 +797,13 @@ def simulate():
     new_price = float(data['new_price'])
     new_qty = float(data['new_qty'])
     user_id = data.get('user_id')
-
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(
-        'SELECT qty_sold,price_per_unit FROM sales WHERE product=%s AND user_id=%s',
-        (product, user_id)
-    )
+    cursor.execute('SELECT qty_sold,price_per_unit FROM sales WHERE product=%s AND user_id=%s', (product, user_id))
     rows = cursor.fetchall()
-    cursor.execute(
-        'SELECT cost_per_unit FROM stock WHERE product=%s AND user_id=%s ORDER BY id DESC LIMIT 1',
-        (product, user_id)
-    )
+    cursor.execute('SELECT cost_per_unit FROM stock WHERE product=%s AND user_id=%s ORDER BY id DESC LIMIT 1', (product, user_id))
     stock_row = cursor.fetchone()
     conn.close()
-
     cost_per_unit = float(stock_row[0]) if stock_row else 0
     original_revenue = sum(float(r[0]) * float(r[1]) for r in rows)
     original_profit = original_revenue - (cost_per_unit * sum(r[0] for r in rows))
@@ -899,27 +811,18 @@ def simulate():
     projected_profit = projected_revenue - (cost_per_unit * new_qty)
     difference = projected_profit - original_profit
     percent = ((difference / abs(original_profit)) * 100) if original_profit != 0 else 0
-
     if difference > 0:
         verdict = f"Good move! Selling {int(new_qty)} units at KES {new_price:,.0f} gives revenue of KES {projected_revenue:,.0f} and profit of KES {projected_profit:,.0f} — KES {difference:,.0f} more ({percent:.1f}% increase)."
     elif difference < 0:
         verdict = f"Careful! Revenue of KES {projected_revenue:,.0f} but profit only KES {projected_profit:,.0f} — KES {abs(difference):,.0f} less ({abs(percent):.1f}% decrease)."
     else:
         verdict = f"No change. Projected profit is KES {projected_profit:,.0f}."
-
     return jsonify({
-        'original_revenue': round(original_revenue, 2),
-        'projected_revenue': round(projected_revenue, 2),
-        'projected_profit': round(projected_profit, 2),
-        'difference': round(difference, 2),
-        'percent': round(percent, 1),
-        'verdict': verdict
+        'original_revenue': round(original_revenue, 2), 'projected_revenue': round(projected_revenue, 2),
+        'projected_profit': round(projected_profit, 2), 'difference': round(difference, 2),
+        'percent': round(percent, 1), 'verdict': verdict
     })
 
-
-# ========================
-# TEST
-# ========================
 
 @app.route('/api/test', methods=['GET'])
 def test():

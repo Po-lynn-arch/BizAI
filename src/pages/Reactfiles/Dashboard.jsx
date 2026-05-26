@@ -1,8 +1,8 @@
-import './Dashboard.css'
+import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
-import { Sidebar } from '../components/Sidebar'
-import { useSessionExpiry } from './UseSessionExpiry'
+import { Sidebar } from '../../components/Sidebar'
+import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 
 export function Dashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

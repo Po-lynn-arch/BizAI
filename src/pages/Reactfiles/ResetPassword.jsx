@@ -1,4 +1,4 @@
-import './Authentication.css'
+import '../CSS/Authentication.css'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 

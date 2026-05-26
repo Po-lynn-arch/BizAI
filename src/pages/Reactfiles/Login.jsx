@@ -1,4 +1,4 @@
-import './Authentication.css'
+import '../CSS/Authentication.css'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -212,7 +212,8 @@ export function Login() {
             marginTop: '12px',
             cursor: 'pointer',
             color: '#4f46e5',
-            textAlign: 'center'
+            textAlign: 'center',
+            fontSize: '12px'
           }}
           onClick={() =>
             navigate('/forgot-password')

@@ -1,7 +1,7 @@
-import './Dashboard.css'
-import './Simulation.css'
+import '../CSS/Dashboard.css'
+import '../CSS/Simulation.css'
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar } from '../../components/Sidebar'
 
 export function Simulation() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')

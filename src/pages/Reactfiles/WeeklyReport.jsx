@@ -1,9 +1,9 @@
-import './Dashboard.css'
+import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend
 } from 'recharts'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar } from '../../components/Sidebar'
 
 export function WeeklyReport() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
