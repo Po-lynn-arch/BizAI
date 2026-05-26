@@ -8,6 +8,8 @@ from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer
 import random, string, os
 from datetime import datetime, timedelta
+import threading
+
 
 app = Flask(__name__)
 
@@ -44,7 +46,8 @@ def get_db():
         user=os.environ.get('DB_USER', 'root'),
         password=os.environ.get('DB_PASSWORD', ''),
         database=os.environ.get('DB_NAME', 'bizai'),
-        port=int(os.environ.get('DB_PORT', 3306))
+        port=int(os.environ.get('DB_PORT', 3306)),
+        ssl_disabled=False
     )
 
 
@@ -52,13 +55,15 @@ def get_today():
     now = datetime.now()
     return f"{now.month}/{now.day}/{now.year}"
 
+
 def init_db():
     try:
         conn = mysql.connector.connect(
             host=os.environ.get('DB_HOST', 'localhost'),
             user=os.environ.get('DB_USER', 'root'),
             password=os.environ.get('DB_PASSWORD', ''),
-            port=int(os.environ.get('DB_PORT', 3306))
+            port=int(os.environ.get('DB_PORT', 3306)),
+            ssl_disabled=False
         )
         cursor = conn.cursor()
         db_name = os.environ.get('DB_NAME', 'bizai')
@@ -142,7 +147,8 @@ def init_db():
         print(f'[BizAI] DB not connected: {e}')
 
 
-init_db()
+# run init_db in background so it doesn't block gunicorn startup
+threading.Thread(target=init_db, daemon=True).start()
 
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
