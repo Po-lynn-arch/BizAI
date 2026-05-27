@@ -1,6 +1,6 @@
 import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 
 export function Stock() {
