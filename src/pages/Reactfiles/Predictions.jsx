@@ -2,8 +2,8 @@ import './Dashboard.css'
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Sidebar } from '../components/Sidebar'
+import { API_URL } from '../../hooks/config'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
 
 export function Predictions() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
