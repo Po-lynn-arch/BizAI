@@ -17,7 +17,7 @@ export function Simulation() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`)
+    fetch(`${API_URL/api/sales?user_id=${user.id}`)
     .then(res => res.json()).then(d => setIncome(d))
   }, [])
 
@@ -33,7 +33,7 @@ export function Simulation() {
     setMessages(prev => [...prev, { from: 'user', text: userMsg }])
     setLoading(true)
 
-    const response = await fetch('https://bizai-backend-z4dh.onrender.com/api/simulate', {
+    const response = await fetch('${API_URL/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

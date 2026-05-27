@@ -1,11 +1,10 @@
-import '../CSS/DataEntry.css'
+import './DataEntry.css'
 import { useState, useEffect } from 'react'
-import { Sidebar } from '../../components/Sidebar'
+import { Sidebar } from '../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 
 export function Stock() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
-
   const [stock, setStock] = useState([])
   const [product, setProduct] = useState('')
   const [qty, setQty] = useState('')
@@ -13,72 +12,102 @@ export function Stock() {
   const [duration, setDuration] = useState('30')
   const [suggestedPrice, setSuggestedPrice] = useState('')
   const [stockType, setStockType] = useState('new')
-  
+  const [mode, setMode] = useState('single') // single or multi
+  const [entries, setEntries] = useState([{ qty_bought: '', cost_per_unit: '', suggested_price: '' }])
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
 
   function loadStock() {
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/stock?user_id=${user.id}`)
+    fetch(`${API_URL}/api/stock?user_id=${user.id}`)
       .then(res => res.json())
-      .then(data => setStock(data))
+      .then(data => setStock(Array.isArray(data) ? data : []))
       .catch(err => console.error('Failed to load stock:', err))
   }
 
-  useEffect(() => {
-    loadStock()
-  }, [])
+  useEffect(() => { loadStock() }, [])
+
+  function addEntry() {
+    setEntries([...entries, { qty_bought: '', cost_per_unit: '', suggested_price: '' }])
+  }
+
+  function removeEntry(idx) {
+    if (entries.length === 1) return
+    setEntries(entries.filter((_, i) => i !== idx))
+  }
+
+  function updateEntry(idx, field, value) {
+    const updated = [...entries]
+    updated[idx][field] = value
+    setEntries(updated)
+  }
 
   async function addStock() {
-    // Validation
-    if (!product || !qty) {
-      alert('Please fill in all required fields')
-      return
-    }
+    setError(''); setSuccess('')
+    if (!product) { setError('Please enter a product name'); return }
 
-    if (stockType === 'new' && !cost) {
-      alert('Please enter cost per unit')
-      return
-    }
-
+    setLoading(true)
     try {
-      await fetch('https://bizai-backend-z4dh.onrender.com/api/stock', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          product,
-          qty_bought: Number(qty),
-          cost_per_unit:
-            stockType === 'new' ? Number(cost) : 0,
-          suggested_price:
-            stockType === 'new'
-              ? Number(suggestedPrice) || 0
-              : 0,
-          duration_days: Number(duration),
-          stock_type: stockType,
-          date: new Date().toLocaleDateString()
+      if (mode === 'single') {
+        if (!qty) { setError('Please enter quantity'); setLoading(false); return }
+        if (stockType === 'new' && !cost) { setError('Please enter cost per unit'); setLoading(false); return }
+
+        const res = await fetch(`${API_URL}/api/stock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id, product,
+            qty_bought: Number(qty),
+            cost_per_unit: stockType === 'new' ? Number(cost) : 0,
+            suggested_price: Number(suggestedPrice) || 0,
+            duration_days: Number(duration),
+            stock_type: stockType,
+            date: new Date().toLocaleDateString()
+          })
         })
-      })
+        const data = await res.json()
+        if (res.ok) {
+          setSuccess('Stock added successfully!')
+          setProduct(''); setQty(''); setCost(''); setSuggestedPrice(''); setDuration('30')
+          loadStock()
+        } else {
+          setError(data.error)
+        }
+      } else {
+        // multi — add each entry separately
+        const validEntries = entries.filter(e => Number(e.qty_bought) > 0)
+        if (validEntries.length === 0) { setError('Add at least one entry with quantity'); setLoading(false); return }
 
-      loadStock()
-
-      // Reset form
-      setProduct('')
-      setQty('')
-      setCost('')
-      setSuggestedPrice('')
-      setDuration('30')
-      setStockType('new')
+        for (const e of validEntries) {
+          await fetch(`${API_URL}/api/stock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: user.id, product,
+              qty_bought: Number(e.qty_bought),
+              cost_per_unit: stockType === 'new' ? Number(e.cost_per_unit) : 0,
+              suggested_price: Number(e.suggested_price) || 0,
+              duration_days: Number(duration),
+              stock_type: stockType,
+              date: new Date().toLocaleDateString()
+            })
+          })
+        }
+        setSuccess('All stock entries added!')
+        setEntries([{ qty_bought: '', cost_per_unit: '', suggested_price: '' }])
+        setProduct('')
+        loadStock()
+      }
     } catch (err) {
-      console.error('Failed to add stock:', err)
-      alert('Failed to add stock')
+      setError('Failed to add stock. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <div className="dashboard">
       <Sidebar />
-
       <div className="main-content-area">
         <header className="topbar">
           <div>
@@ -88,308 +117,157 @@ export function Stock() {
         </header>
 
         <div className="entry-form">
-
-        
-
-        {/* ROW 1 */}
-        <div className="form-row" style={{ marginBottom: '16px' }}>
-          <div className="form-field">
-            <label>Stock Type</label>
-
-            <select
-              value={stockType}
-              onChange={e => setStockType(e.target.value)}
-            >
-              <option value="new">
-                🛒 New Purchase — buying today
-              </option>
-
-              <option value="existing">
-                📋 Existing Stock — already had this
-              </option>
-            </select>
-          </div>
-        </div>
-
-        {/* INFO BOX */}
-        <div
-          style={{
-            background:
-              stockType === 'new'
-                ? '#1a1a0d'
-                : '#0d1b2b',
-
-            border: `1px solid ${
-              stockType === 'new'
-                ? '#FFA500'
-                : '#3b82f6'
-            }`,
-
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '16px',
-
-            color:
-              stockType === 'new'
-                ? '#FFA500'
-                : '#93c5fd',
-
-            fontSize: '14px'
-          }}
-        >
-          {stockType === 'new'
-            ? '🛒 New Purchase — stock you are buying today. Cost will be tracked and used in your profit calculations.'
-            : '📋 Existing Stock — stock you already had before using BizAI. Only the quantity will be tracked. No cost will be recorded so it does not affect your profit.'}
-        </div>
-
-        {/* ROW 2 */}
-        <div className="form-row">
-
-          <div className="form-field">
-            <label>Product Name</label>
-
-            <input
-              placeholder="e.g. Milk, Bread, Sugar"
-              value={product}
-              onChange={e => setProduct(e.target.value)}
-            />
+          {/* Stock Type */}
+          <div className="form-row" style={{ marginBottom: '16px' }}>
+            <div className="form-field">
+              <label>Stock Type</label>
+              <select value={stockType} onChange={e => setStockType(e.target.value)}>
+                <option value="new">🛒 New Purchase — buying today</option>
+                <option value="existing">📋 Existing Stock — already had this</option>
+              </select>
+            </div>
           </div>
 
-          <div className="form-field">
-            <label>Quantity Bought</label>
-
-            <input
-              type="number"
-              placeholder="e.g. 700"
-              value={qty}
-              onChange={e => setQty(e.target.value)}
-            />
+          <div style={{
+            background: stockType === 'new' ? '#1a1a0d' : '#0d1b2b',
+            border: `1px solid ${stockType === 'new' ? '#FFA500' : '#3b82f6'}`,
+            borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
+            color: stockType === 'new' ? '#FFA500' : '#93c5fd', fontSize: '14px'
+          }}>
+            {stockType === 'new'
+              ? '🛒 New Purchase — cost will be tracked for profit calculations.'
+              : '📋 Existing Stock — only quantity tracked. No cost recorded.'}
           </div>
 
-          {stockType === 'new' && (
+          {/* Product name */}
+          <div className="form-row" style={{ marginBottom: '16px' }}>
+            <div className="form-field">
+              <label>Product Name</label>
+              <input placeholder="e.g. Milk, Bread, Trousers" value={product} onChange={e => setProduct(e.target.value)} />
+            </div>
+            <div className="form-field">
+              <label>This stock is for</label>
+              <select value={duration} onChange={e => setDuration(e.target.value)}>
+                <option value="1">Today only (1 day)</option>
+                <option value="7">This week (7 days)</option>
+                <option value="30">This month (30 days)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Mode toggle */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {[['single', '📦 Single Entry'], ['multi', '🗂 Multiple Entries']].map(([m, label]) => (
+              <button key={m} onClick={() => setMode(m)} style={{
+                padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+                background: mode === m ? '#FFA500' : 'transparent',
+                color: mode === m ? '#000' : '#aaa',
+                border: mode === m ? 'none' : '1px solid #2a2a2a'
+              }}>{label}</button>
+            ))}
+          </div>
+
+          {mode === 'single' ? (
+            <div className="form-row">
+              <div className="form-field">
+                <label>Quantity</label>
+                <input type="number" placeholder="e.g. 100" value={qty} onChange={e => setQty(e.target.value)} />
+              </div>
+              {stockType === 'new' && (
+                <>
+                  <div className="form-field">
+                    <label>Cost per Unit (KES)</label>
+                    <input type="number" placeholder="e.g. 50" value={cost} onChange={e => setCost(e.target.value)} />
+                  </div>
+                  <div className="form-field">
+                    <label>Suggested Selling Price (KES)</label>
+                    <input type="number" placeholder="e.g. 80" value={suggestedPrice} onChange={e => setSuggestedPrice(e.target.value)} />
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
             <>
-              <div className="form-field">
-                <label>Cost per Unit (KES)</label>
-
-                <input
-                  type="number"
-                  placeholder="e.g. 50"
-                  value={cost}
-                  onChange={e => setCost(e.target.value)}
-                />
+              <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: '#93c5fd' }}>
+                💡 Use this when you bought the same product in batches at different costs. Each row is one batch.
               </div>
-
-              
-
-              <div className="form-field">
-                <label>Suggested Selling Price (KES)</label>
-
-                <input
-                  type="number"
-                  placeholder="e.g. 80"
-                  value={suggestedPrice}
-                  onChange={e =>
-                    setSuggestedPrice(e.target.value)
-                  }
-                />
-              </div>
+              {entries.map((entry, idx) => (
+                <div key={idx} className="form-row" style={{ alignItems: 'flex-end', marginBottom: '10px' }}>
+                  <div className="form-field">
+                    <label>Qty (Batch {idx + 1})</label>
+                    <input type="number" placeholder="e.g. 50" value={entry.qty_bought}
+                      onChange={e => updateEntry(idx, 'qty_bought', e.target.value)} />
+                  </div>
+                  {stockType === 'new' && (
+                    <>
+                      <div className="form-field">
+                        <label>Cost/Unit (KES)</label>
+                        <input type="number" placeholder="e.g. 50" value={entry.cost_per_unit}
+                          onChange={e => updateEntry(idx, 'cost_per_unit', e.target.value)} />
+                      </div>
+                      <div className="form-field">
+                        <label>Sell Price (KES)</label>
+                        <input type="number" placeholder="e.g. 80" value={entry.suggested_price}
+                          onChange={e => updateEntry(idx, 'suggested_price', e.target.value)} />
+                      </div>
+                    </>
+                  )}
+                  <button onClick={() => removeEntry(idx)} style={{
+                    background: '#2b0d0d', border: '1px solid #ff4444', color: '#ff4444',
+                    borderRadius: '6px', padding: '8px 12px', cursor: 'pointer', marginBottom: '4px'
+                  }}>✕</button>
+                </div>
+              ))}
+              <button onClick={addEntry} style={{
+                background: 'transparent', border: '1px dashed #FFA500', color: '#FFA500',
+                borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', marginBottom: '16px', fontSize: '13px'
+              }}>+ Add Another Batch</button>
             </>
           )}
 
-          
-          <div className="form-field">
-            <label>This stock is for</label>
+          {error && <p style={{ color: 'red', fontSize: '14px', marginTop: '8px' }}>{error}</p>}
+          {success && <p style={{ color: '#10B981', fontSize: '14px', marginTop: '8px' }}>✅ {success}</p>}
 
-            <select
-              value={duration}
-              onChange={e => setDuration(e.target.value)}
-            >
-              <option value="1">
-                Today only (1 day)
-              </option>
-
-              <option value="7">
-                This week (7 days)
-              </option>
-
-              <option value="30">
-                This month (30 days)
-              </option>
-            </select>
-          </div>
-
-  </div>
-          {/* SUMMARY */}
-          {stockType === 'new' &&
-            qty &&
-            cost &&
-            suggestedPrice && (
-              <div
-                style={{
-                  background: '#111',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  marginBottom: '12px',
-                  fontSize: '13px'
-                }}
-              >
-                <p style={{ color: '#FFA500' }}>
-                  💰 Total investment: KES{' '}
-                  {(
-                    Number(qty) * Number(cost)
-                  ).toLocaleString()}
-                </p>
-
-                <p style={{ color: '#aaa' }}>
-                  📅 Daily cost: KES{' '}
-                  {(
-                    (Number(qty) * Number(cost)) /
-                    Number(duration)
-                  ).toFixed(0)}
-                </p>
-
-                <p style={{ color: '#10B981' }}>
-                  📈 Expected revenue if all sold: KES{' '}
-                  {(
-                    Number(qty) *
-                    Number(suggestedPrice)
-                  ).toLocaleString()}
-                </p>
-
-                <p style={{ color: '#fff' }}>
-                  💡 Expected profit: KES{' '}
-                  {(
-                    (Number(suggestedPrice) -
-                      Number(cost)) *
-                    Number(qty)
-                  ).toLocaleString()}
-                </p>
-              </div>
-            )}
-
-          {/* BUTTON */}
-          <button
-            className="add-btn"
-            style={{ background: '#FFA500' }}
-            onClick={addStock}
-          >
-            + Add Stock
+          <button className="add-btn" style={{ background: '#FFA500', color: '#000' }} onClick={addStock} disabled={loading}>
+            {loading ? 'Adding...' : '+ Add Stock'}
           </button>
         </div>
 
-        {/* STOCK TABLE */}
+        {/* Stock Table */}
         <div className="recent-sales">
-          <h3>
-            Current Stock ({stock.length} products)
-          </h3>
-
-          {stock.length === 0 ? (
-            <p className="empty-state">
-              No stock added yet.
-            </p>
-          ) : (
+          <h3>Current Stock ({stock.length} products)</h3>
+          {stock.length === 0 ? <p className="empty-state">No stock added yet.</p> : (
             <table>
               <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Type</th>
-                  <th>Bought</th>
-                  <th>Remaining</th>
-                  <th>Cost/Unit</th>
-                  <th>Sell Price</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                </tr>
+                <tr><th>Product</th><th>Type</th><th>Bought</th><th>Remaining</th><th>Cost/Unit</th><th>Sell Price</th><th>Duration</th><th>Status</th></tr>
               </thead>
-
               <tbody>
                 {stock.map(s => {
-                  const percent = Math.round(
-                    (s.qty_remaining / s.qty_bought) * 100
-                  )
-
-                  const color =
-                    percent <= 10
-                      ? '#ff4444'
-                      : percent <= 30
-                      ? '#FFA500'
-                      : '#10B981'
-
+                  const percent = Math.round((s.qty_remaining / s.qty_bought) * 100)
+                  const color = percent <= 10 ? '#ff4444' : percent <= 30 ? '#FFA500' : '#10B981'
                   return (
                     <tr key={s.id}>
                       <td>{s.product}</td>
-
                       <td>
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-
-                            background:
-                              s.stock_type === 'new'
-                                ? '#2b2000'
-                                : '#0d1b2b',
-
-                            color:
-                              s.stock_type === 'new'
-                                ? '#FFA500'
-                                : '#93c5fd'
-                          }}
-                        >
-                          {s.stock_type === 'new'
-                            ? '🛒 New'
-                            : '📋 Existing'}
+                        <span style={{
+                          padding: '3px 8px', borderRadius: '8px', fontSize: '12px',
+                          background: s.stock_type === 'new' ? '#2b2000' : '#0d1b2b',
+                          color: s.stock_type === 'new' ? '#FFA500' : '#93c5fd'
+                        }}>
+                          {s.stock_type === 'new' ? '🛒 New' : '📋 Existing'}
                         </span>
                       </td>
-
                       <td>{s.qty_bought} units</td>
-
-                      <td
-                        style={{
-                          color,
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        {s.qty_remaining} units
-                      </td>
-
+                      <td style={{ color, fontWeight: 'bold' }}>{s.qty_remaining} units</td>
+                      <td>KES {s.cost_per_unit}</td>
+                      <td>KES {s.suggested_price || '—'}</td>
+                      <td>{s.duration_days === 1 ? 'Daily' : s.duration_days === 7 ? 'Weekly' : 'Monthly'}</td>
                       <td>
-                        KES {s.cost_per_unit}
-                      </td>
-
-                      <td>
-                        KES {s.suggested_price || '—'}
-                      </td>
-
-                      <td>
-                        {s.duration_days === 1
-                          ? 'Daily'
-                          : s.duration_days === 7
-                          ? 'Weekly'
-                          : 'Monthly'}
-                      </td>
-
-                      <td>
-                        <span
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-
-                            background:
-                              percent <= 10
-                                ? '#2b0d0d'
-                                : percent <= 30
-                                ? '#2b2000'
-                                : '#0d2b1f',
-
-                            color
-                          }}
-                        >
-                          {percent}% remaining
-                        </span>
+                        <span style={{
+                          padding: '3px 8px', borderRadius: '8px', fontSize: '12px',
+                          background: percent <= 10 ? '#2b0d0d' : percent <= 30 ? '#2b2000' : '#0d2b1f',
+                          color
+                        }}>{percent}% remaining</span>
                       </td>
                     </tr>
                   )

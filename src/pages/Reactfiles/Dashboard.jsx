@@ -13,10 +13,15 @@ export function Dashboard() {
   const [reminders, setReminders] = useState([])
 
   useEffect(() => {
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`)
-      .then(res => res.json()).then(setSales)
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/reminders?user_id=${user.id}`)
-      .then(res => res.json()).then(setReminders)
+    Promise.all([
+      fetch(`${API_URL}/api/sales?user_id=${user.id}`).then(res => res.json()),
+
+      fetch(`${API_URL}/api/reminders?user_id=${user.id}`).then(res => res.json())
+    ]).then(([salesData, remindersData]) => {
+      setSales(salesData),
+      setReminders(remindersData)
+    })
+   
   }, [])
 
   const today = new Date().toLocaleDateString()
@@ -60,11 +65,14 @@ export function Dashboard() {
 
         <div className="feature-cards">
           <div className="card">
+            <div className="card-icon">📊</div>
             <p className="card-label">Today's Profit</p>
-            <p className="card-value" style={{ color: todayProfit >= 0 ? '#10B981' : '#ff4444' }}>
-              KES {todayProfit.toLocaleString()}
+            <p className="card-value" style={{ color: summary.today_profit >= 0 ? '#10B981' : '#ff4444' }}>
+              KES {summary.today_profit.toLocaleString()}
             </p>
-            <p style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>Revenue: KES {todayRevenue.toLocaleString()}</p>
+            <p style={{ fontSize: '11px', color: summary.today_profit >= 0 ? '#10B981' : '#ff4444' }}>
+              {summary.today_profit >= 0 ? '✅ Profitable today' : '⚠️ Not profitable today'}
+            </p>
           </div>
 
           <div className="card">
@@ -98,6 +106,22 @@ export function Dashboard() {
               <Line type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={1.5} name="Revenue" dot={false} strokeDasharray="4 4" />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+        <div style={{
+          background: summary.total_profit >= 0 ? '#0d2b1f' : '#2b0d0d',
+          border: `1px solid ${summary.total_profit >= 0 ? '#10B981' : '#ff4444'}`,
+          borderRadius: '12px', padding: '16px', marginBottom: '24px', fontSize: '14px'
+        }}>
+          {summary.total_profit >= 0 ? (
+            <p style={{ color: '#10B981' }}>
+              ✅ <strong>Your business is profitable!</strong> You have made KES {summary.total_profit.toLocaleString()} profit from your sales so far.
+              {summary.today_profit > 0 && ` Today alone you made KES ${summary.today_profit.toLocaleString()}.`}
+            </p>
+          ) : (
+            <p style={{ color: '#ff4444' }}>
+              ⚠️ <strong>Your costs are exceeding your sales profit.</strong> Review your stock costs and operational expenses to improve profitability.
+            </p>
+          )}
         </div>
       </div>
     </div>

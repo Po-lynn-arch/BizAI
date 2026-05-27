@@ -1,23 +1,33 @@
-import '../CSS/Dashboard.css'
-import '../CSS/Predictions.css'
+import './Dashboard.css'
 import { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Sidebar } from '../../components/Sidebar'
-import { API_URL } from '../../hooks/config'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Sidebar } from '../components/Sidebar'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
 
 export function Predictions() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   const [predictions, setPredictions] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/predictions?user_id=${user.id}`)
+    fetch(`${API_URL}/api/predictions?user_id=${user.id}`)
       .then(res => res.json())
-      .then(data => setPredictions(data))
+      .then(data => { setPredictions(Array.isArray(data) ? data : []); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const medals = ['🥇', '🥈', '🥉']
   const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32']
-  const hasMetrics = predictions.length > 0 && predictions[0].confidence !== 'N/A'
+
+  if (loading) return (
+    <div className="dashboard">
+      <Sidebar />
+      <div className="main-content-area" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#aaa' }}>Loading predictions...</p>
+      </div>
+    </div>
+  )
 
   return (
     <div className="dashboard">
@@ -26,58 +36,51 @@ export function Predictions() {
         <header className="topbar">
           <div>
             <h2>🤖 AI Predictions</h2>
-            <p>Machine learning powered demand forecast for next month</p>
+            <p>Products ranked by units sold — your real bestsellers</p>
           </div>
         </header>
 
-        {/* ML EXPLANATION */}
         <div style={{ background: '#111', border: '1px solid #2a2a2a', borderRadius: '12px', padding: '16px', marginBottom: '24px', fontSize: '14px', color: '#aaa' }}>
           <strong style={{ color: '#fff' }}>🧠 How this works:</strong>
           <br /><br />
-          "Based on your sales history, here are the products your business is expected to sell the most next month. Stock up on these to meet demand and maximise your revenue."
-          {hasMetrics && (
-            <>
-              <br /><br />
-              <strong style={{ color: '#fff' }}>📊 Model Performance: </strong>
-              <span style={{ color: '#10B981' }}>{predictions[0].confidence}</span>
-              <br />
-              
-              <span style={{ fontSize: '12px' }}>F1 Score measures how accurately the model identifies high-demand products. Closer to 1.0 is better.</span>
-            </>
-          )}
+          These are your top products ranked by <strong style={{ color: '#10B981' }}>quantity sold</strong> — not revenue. This tells you what your customers actually buy the most, so you know what to stock up on next month.
         </div>
 
         {predictions.length === 0 ? (
           <div className="recent-sales">
-            <p className="empty-state">No income data yet. Add at least 5 income entries.</p>
+            <p className="empty-state">No sales data yet. Record some sales first.</p>
           </div>
         ) : (
-          <div className="predictions-grid">
-            {predictions.map((p, index) => (
-              <div className="prediction-card" key={index} style={{ borderColor: medalColors[index] }}>
-                <div className="medal">{medals[index]}</div>
-                <h3 className="product-name">{p.product}</h3>
-                <p className="product-revenue">KES {p.revenue.toLocaleString()}</p>
-                <p className="product-label">Total Revenue Earned</p>
-                <p className="prediction-note">{p.prediction}</p>
-                {p.confidence !== 'N/A' && (
-                  <p style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>{p.confidence}</p>
-                )}
-              </div>
-            ))}
-            <div className="chart-card">
-              <h3>Top Products Revenue Comparison</h3>
+          <>
+            <div className="predictions-grid">
+              {predictions.map((p, index) => (
+                <div className="prediction-card" key={index} style={{ borderColor: medalColors[index] || '#2a2a2a' }}>
+                  <div className="medal">{medals[index] || '🏅'}</div>
+                  <h3 className="product-name">{p.product}</h3>
+                  <p className="product-revenue" style={{ color: '#10B981' }}>{p.total_qty?.toLocaleString()} units sold</p>
+                  <p className="product-label">Total Units Sold</p>
+                  <p style={{ color: '#aaa', fontSize: '13px', marginTop: '4px' }}>Revenue: KES {p.revenue?.toLocaleString()}</p>
+                  <p className="prediction-note">{p.prediction}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="chart-card" style={{ marginTop: '24px' }}>
+              <h3>Top Products — Units Sold</h3>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={predictions.map(p => ({ product: p.product, revenue: p.revenue }))}>
+                <BarChart data={predictions.map(p => ({ product: p.product, units: p.total_qty, revenue: p.revenue }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
                   <XAxis dataKey="product" stroke="#aaaaaa" fontSize={12} />
                   <YAxis stroke="#aaaaaa" fontSize={12} />
-                  <Tooltip contentStyle={{ backgroundColor: '#111', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#fff' }} />
-                  <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} dot={{ fill: '#10B981', r: 6 }} />
-                </LineChart>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#111', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#fff' }}
+                    formatter={(val, name) => [name === 'units' ? `${val} units` : `KES ${val?.toLocaleString()}`, name === 'units' ? 'Units Sold' : 'Revenue']}
+                  />
+                  <Bar dataKey="units" fill="#10B981" radius={[4, 4, 0, 0]} name="units" />
+                </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

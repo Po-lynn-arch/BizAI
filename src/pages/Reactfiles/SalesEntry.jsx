@@ -8,20 +8,21 @@ export function SalesEntry() {
   const [sales, setSales] = useState([])
   const [stock, setStock] = useState([])
   const [product, setProduct] = useState('')
-  const [mode, setMode] = useState('single') // 'single' or 'multi'
+  const [mode, setMode] = useState('single')
   const [qty, setQty] = useState('')
   const [price, setPrice] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-
-  // Multi-price entries: [{qty_sold, price_per_unit}]
   const [entries, setEntries] = useState([{ qty_sold: '', price_per_unit: '' }])
 
   function loadData() {
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/sales?user_id=${user.id}`)
-      .then(res => res.json()).then(setSales)
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/stock?user_id=${user.id}`)
-      .then(res => res.json()).then(setStock)
+    Promise.all([
+      fetch(`${API_URL}/api/sales?user_id=${user.id}`).then(r => r.json()),
+      fetch(`${API_URL}/api/stock?user_id=${user.id}`).then(r => r.json())
+    ]).then(([salesData, stockData]) => {
+      setSales(Array.isArray(salesData) ? salesData : [])
+      setStock(Array.isArray(stockData) ? stockData : [])
+    }).catch(err => console.error('Failed to load data:', err))
   }
 
   useEffect(() => { loadData() }, [])
@@ -60,7 +61,7 @@ export function SalesEntry() {
   async function recordSingleSale() {
     setError(''); setSuccess('')
     if (!product || !qty || !price) { setError('Fill all fields'); return }
-    const res = await fetch('https://bizai-backend-z4dh.onrender.com/api/sales', {
+    const res = await fetch(`${API_URL}/api/sales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -84,7 +85,7 @@ export function SalesEntry() {
     if (!product) { setError('Select a product'); return }
     const validEntries = entries.filter(e => Number(e.qty_sold) > 0 && Number(e.price_per_unit) > 0)
     if (validEntries.length === 0) { setError('Add at least one entry with qty and price'); return }
-    const res = await fetch('https://bizai-backend-z4dh.onrender.com/api/sales', {
+    const res = await fetch(`${API_URL}/api/sales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -104,7 +105,7 @@ export function SalesEntry() {
   }
 
   async function deleteSale(id) {
-    await fetch(`https://bizai-backend-z4dh.onrender.com/api/sales/${id}`, { method: 'DELETE' })
+    await fetch(`${API_URL}/api/sales/${id}`, { method: 'DELETE' })
     loadData()
   }
 
@@ -118,7 +119,6 @@ export function SalesEntry() {
         </header>
 
         <div className="entry-form">
-          {/* Product selector */}
           <div className="form-row">
             <div className="form-field">
               <label>Product</label>
@@ -141,7 +141,6 @@ export function SalesEntry() {
             </div>
           )}
 
-          {/* Mode toggle */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             {[['single', '📝 Single Price'], ['multi', '🗂 Multiple Prices']].map(([m, label]) => (
               <button key={m} onClick={() => setMode(m)} style={{

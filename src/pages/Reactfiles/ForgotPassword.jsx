@@ -16,7 +16,7 @@ export function ForgotPassword() {
     if (!email) { setError('Please enter your email address'); return }
     setLoading(true)
     try {
-      const res = await fetch('https://bizai-backend-z4dh.onrender.com/api/forgot-password', {
+      const res = await fetch('${API_URL/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

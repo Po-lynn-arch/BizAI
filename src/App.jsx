@@ -14,7 +14,6 @@ import { ProtectedRoute } from './pages/Reactfiles/ProtectedRoute'
 import { VerifyEmail } from './pages/Reactfiles/VerifyEmail'
 import { ForgotPassword } from './pages/Reactfiles/ForgotPassword'
 import { ResetPassword } from './pages/Reactfiles/ResetPassword'
-import { WeeklyReport } from './pages/Reactfiles/WeeklyReport'
 
 export function App() {
   return (
@@ -33,7 +32,7 @@ export function App() {
         <Route path="/VerifyEmail" element={<ProtectedRoute><VerifyEmail/></ProtectedRoute>}/>
         <Route path='/forgot-password' element={<ProtectedRoute><ForgotPassword/></ProtectedRoute>}></Route>
         <Route path='/reset-password/:token' element={<ProtectedRoute><ResetPassword/></ProtectedRoute>}></Route>
-        <Route path="/WeeklyReport" element={<WeeklyReport />} />
+        
       </Routes>
   )
 }

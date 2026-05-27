@@ -1,1 +1,1 @@
-export const API_URL = 'https://bizai-backend-z4dh.onrender.com'
+export const API_URL = '${API_URL}'

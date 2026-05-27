@@ -1,8 +1,9 @@
-import '../CSS/Dashboard.css'
+import './Dashboard.css'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sidebar } from '../../components/Sidebar'
-import { API_URL } from '../../hooks/config'
+import { Sidebar } from '../components/Sidebar'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
 
 export function AdminPage() {
   const navigate = useNavigate()
@@ -13,20 +14,19 @@ export function AdminPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
 
   function loadUsers() {
-    fetch(`https://bizai-backend-z4dh.onrender.com/api/admin/users/${user.id}`)
-      .then(res => res.json())
-      .then(data => {
-        // handle error response from server
-        if (Array.isArray(data)) {
-          setUsers(data)
-        } else {
-          setUsers([])
-          if (data.error) setError(data.error)
-        }
-      })
-      .catch(() => setUsers([]))
+    Promise.all([
+      fetch(`${API_URL}/api/admin/users/${user.id}`).then(r => r.json())
+    ]).then(([usersData]) => {
+      if (Array.isArray(usersData)) {
+        setUsers(usersData)
+      } else {
+        setUsers([])
+        if (usersData.error) setError(usersData.error)
+      }
+    }).catch(() => setUsers([]))
   }
 
   useEffect(() => {
@@ -35,31 +35,41 @@ export function AdminPage() {
   }, [])
 
   async function addUser() {
+    setError(''); setSuccess('')
     if (!name || !email || !password) { setError('Please fill in all fields'); return }
-    const response = await fetch('https://bizai-backend-z4dh.onrender.com/api/admin/add-user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_id: user.id, name, email, password })
-    })
-    const data = await response.json()
-    if (response.ok) {
-      setSuccess('User added successfully')
-      setError('')
-      setName(''); setEmail(''); setPassword('')
-      loadUsers()
-    } else {
-      setError(data.error)
-      setSuccess('')
+    setLoading(true)
+    try {
+      const response = await fetch(`${API_URL}/api/admin/add-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_id: user.id, name, email, password })
+      })
+      const data = await response.json()
+      if (response.ok) {
+        setSuccess('User added successfully')
+        setName(''); setEmail(''); setPassword('')
+        loadUsers()
+      } else {
+        setError(data.error)
+      }
+    } catch {
+      setError('Failed to add user. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
   async function removeUser(userId) {
-    await fetch(`https://bizai-backend-z4dh.onrender.com/api/admin/users/${userId}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ admin_id: user.id })
-    })
-    loadUsers()
+    try {
+      await fetch(`${API_URL}/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_id: user.id })
+      })
+      loadUsers()
+    } catch {
+      setError('Failed to remove user.')
+    }
   }
 
   return (
@@ -94,7 +104,9 @@ export function AdminPage() {
           </div>
           {error && <p style={{ color: 'red', fontSize: '14px' }}>{error}</p>}
           {success && <p style={{ color: '#10B981', fontSize: '14px' }}>{success}</p>}
-          <button className="add-btn" onClick={addUser}>+ Add User</button>
+          <button className="add-btn" onClick={addUser} disabled={loading}>
+            {loading ? 'Adding...' : '+ Add User'}
+          </button>
         </div>
 
         <div className="recent-sales">
