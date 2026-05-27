@@ -21,7 +21,7 @@ export function ResetPassword() {
     if (password !== confirm) { setError('Passwords do not match'); return }
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL/api/reset-password/${token}`, {
+      const res = await fetch(`${API_URL}/api/reset-password/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password })

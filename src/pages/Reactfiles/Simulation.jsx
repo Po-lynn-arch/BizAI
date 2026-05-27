@@ -17,7 +17,7 @@ export function Simulation() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch(`${API_URL/api/sales?user_id=${user.id}`)
+    fetch(`${API_URL}/api/sales?user_id=${user.id}`)
     .then(res => res.json()).then(d => setIncome(d))
   }, [])
 

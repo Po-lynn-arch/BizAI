@@ -1,7 +1,7 @@
 import './Dashboard.css'
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Sidebar } from '../components/Sidebar'
+import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 
 
