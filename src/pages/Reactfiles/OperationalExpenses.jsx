@@ -1,4 +1,4 @@
-import './DataEntry.css'
+import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../components/Sidebar'
 import { API_URL } from '../config'

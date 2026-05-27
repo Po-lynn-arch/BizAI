@@ -1,4 +1,4 @@
-import './Dashboard.css'
+import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'

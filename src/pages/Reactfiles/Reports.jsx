@@ -1,4 +1,4 @@
-import './Dashboard.css'
+import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,

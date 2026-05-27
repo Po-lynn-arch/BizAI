@@ -10,7 +10,7 @@ export function VerifyEmail() {
   const [success, setSuccess] = useState(null)
 
   useEffect(() => {
-    fetch(`${API_URL/api/verify-email/${token}`)
+    fetch(`${API_URL}/api/verify-email/${token}`)
       .then(res => res.json())
       .then(data => {
         if (data.message) {
