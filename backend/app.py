@@ -81,7 +81,7 @@ def init_db():
             password VARCHAR(255),
             role VARCHAR(20) DEFAULT 'user',
             business_id INT,
-            is_verified BOOLEAN DEFAULT FALSE,
+            is_verified BOOLEAN DEFAULT TRUE,
             failed_attempts INT DEFAULT 0,
             locked_until DATETIME NULL,
             FOREIGN KEY (business_id) REFERENCES businesses(id)
@@ -124,7 +124,7 @@ def init_db():
         )''')
 
         migrations = [
-            ('users', 'is_verified', 'BOOLEAN DEFAULT FALSE'),
+            ('users', 'is_verified', 'BOOLEAN DEFAULT TRUE'),
             ('users', 'failed_attempts', 'INT DEFAULT 0'),
             ('users', 'locked_until', 'DATETIME NULL'),
             ('sales', 'cost_per_unit', 'DECIMAL(10,2) DEFAULT 0'),
@@ -173,7 +173,7 @@ def register():
         business_id = cursor.lastrowid
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
-            (name, email, generate_password_hash(password), 'admin', business_id, False)
+            (name, email, generate_password_hash(password), 'admin', business_id, True)
         )
         conn.commit()
 
@@ -283,9 +283,10 @@ def login():
         conn.close()
         return jsonify({'error': f'Account locked. Try again after {LOCK_MINUTES} minutes.'}), 403
 
-    if not user[6]:
-        conn.close()
-        return jsonify({'error': 'Please verify your email before logging in. Check your inbox.'}), 403
+    
+    #if not user[6]:
+     #   conn.close()
+      #  return jsonify({'error': 'Please verify your email before logging in. Check your inbox.'}), 403
 
     if not check_password_hash(user[3], password):
         new_attempts = user[7] + 1
