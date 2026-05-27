@@ -14,7 +14,7 @@ import threading
 app = Flask(__name__)
 
 CORS(app, origins=[
-    "https://preeminent-kashata-88aa18.netlify.app",
+    "https://bizai254.netlify.app",
     "http://localhost:5173"
 ], supports_credentials=True, allow_headers=["Content-Type", "Authorization"], methods=["GET", "POST", "DELETE", "OPTIONS"])
 
