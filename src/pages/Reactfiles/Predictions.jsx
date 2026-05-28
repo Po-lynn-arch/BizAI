@@ -4,7 +4,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 
-
 export function Predictions() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   const [predictions, setPredictions] = useState([])
@@ -52,20 +51,42 @@ export function Predictions() {
           </div>
         ) : (
           <>
-            <div className="predictions-grid">
+            {/* TOP PRODUCT HIGHLIGHT CARDS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
               {predictions.map((p, index) => (
-                <div className="prediction-card" key={index} style={{ borderColor: medalColors[index] || '#2a2a2a' }}>
-                  <div className="medal">{medals[index] || '🏅'}</div>
-                  <h3 className="product-name">{p.product}</h3>
-                  <p className="product-revenue" style={{ color: '#10B981' }}>{p.total_qty?.toLocaleString()} units sold</p>
-                  <p className="product-label">Total Units Sold</p>
-                  <p style={{ color: '#aaa', fontSize: '13px', marginTop: '4px' }}>Revenue: KES {p.revenue?.toLocaleString()}</p>
-                  <p className="prediction-note">{p.prediction}</p>
+                <div key={index} style={{
+                  background: '#111',
+                  border: `2px solid ${medalColors[index] || '#2a2a2a'}`,
+                  borderRadius: '12px',
+                  padding: '20px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>{medals[index] || '🏅'}</div>
+                  <p style={{ color: '#fff', fontWeight: '700', fontSize: '16px', marginBottom: '4px' }}>{p.product}</p>
+                  <p style={{ color: medalColors[index] || '#aaa', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>
+                    {p.total_qty?.toLocaleString()}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '12px', marginBottom: '8px' }}>units sold</p>
+                  <p style={{ color: '#10B981', fontSize: '13px', marginBottom: '4px' }}>
+                    KES {p.revenue?.toLocaleString()}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '11px' }}>total revenue</p>
+                  <div style={{
+                    marginTop: '12px',
+                    background: '#1a1a1a',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    fontSize: '12px',
+                    color: '#aaa'
+                  }}>
+                    {p.prediction}
+                  </div>
                 </div>
               ))}
             </div>
 
-            <div className="chart-card" style={{ marginTop: '24px' }}>
+            {/* CHART */}
+            <div className="chart-card">
               <h3>Top Products — Units Sold</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={predictions.map(p => ({ product: p.product, units: p.total_qty, revenue: p.revenue }))}>
@@ -74,7 +95,10 @@ export function Predictions() {
                   <YAxis stroke="#aaaaaa" fontSize={12} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#111', border: '1px solid #2a2a2a', borderRadius: '8px', color: '#fff' }}
-                    formatter={(val, name) => [name === 'units' ? `${val} units` : `KES ${val?.toLocaleString()}`, name === 'units' ? 'Units Sold' : 'Revenue']}
+                    formatter={(val, name) => [
+                      name === 'units' ? `${val} units` : `KES ${val?.toLocaleString()}`,
+                      name === 'units' ? 'Units Sold' : 'Revenue'
+                    ]}
                   />
                   <Bar dataKey="units" fill="#10B981" radius={[4, 4, 0, 0]} name="units" />
                 </BarChart>

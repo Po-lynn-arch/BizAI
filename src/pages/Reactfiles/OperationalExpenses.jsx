@@ -19,7 +19,7 @@ export function OperationalExpenses() {
     ]).then(([expensesData, summaryData]) => {
       setData(Array.isArray(expensesData) ? expensesData : [])
       setTodayProfit(summaryData.today_profit || 0)
-    })
+    }).catch(() => setData([]))
   }
 
   useEffect(() => { loadData() }, [])
@@ -27,7 +27,6 @@ export function OperationalExpenses() {
   async function addExpense() {
     if (!item || !amount) { alert('Please fill in all fields'); return }
     if (Number(amount) <= 0) { alert('Amount must be greater than zero'); return }
-
     await fetch(`${API_URL}/api/operational-expenses`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,6 +60,7 @@ export function OperationalExpenses() {
   const totalDailyCost = data.reduce((sum, d) => sum + getDailyAmount(d.amount, d.frequency), 0)
   const totalMonthly = data.reduce((sum, d) => sum + d.amount, 0)
   const breakEvenGap = totalDailyCost - todayProfit
+  const progressPercent = totalDailyCost > 0 ? Math.min((todayProfit / totalDailyCost) * 100, 100) : 0
 
   return (
     <div className="dashboard">
@@ -69,28 +69,45 @@ export function OperationalExpenses() {
         <header className="topbar">
           <div>
             <h2>🏠 Operational Expenses</h2>
-            <p>Track your business running costs and see your daily break-even target</p>
+            <p>Track your running costs and daily break-even target</p>
           </div>
         </header>
 
         {/* BREAK-EVEN INDICATOR */}
         {data.length > 0 && (
           <div style={{
-            background: breakEvenGap <= 0 ? '#0d2b1f' : '#2b0d0d',
-            border: `1px solid ${breakEvenGap <= 0 ? '#10B981' : '#ff4444'}`,
+            background: breakEvenGap <= 0 ? '#0d2b1f' : '#1a1400',
+            border: `1px solid ${breakEvenGap <= 0 ? '#10B981' : '#F97316'}`,
             borderRadius: '12px', padding: '20px', marginBottom: '24px'
           }}>
-            <h3 style={{ color: breakEvenGap <= 0 ? '#10B981' : '#ff4444', marginBottom: '8px' }}>
-              {breakEvenGap <= 0 ? '✅ You have covered your expenses today!' : '⚠️ You have not covered your expenses today yet'}
+            <h3 style={{ color: breakEvenGap <= 0 ? '#10B981' : '#F97316', marginBottom: '8px' }}>
+              {breakEvenGap <= 0 ? '✅ Expenses covered today!' : '⏳ Working towards break-even'}
             </h3>
-            <p style={{ color: '#aaa', fontSize: '14px', lineHeight: '1.7' }}>
-              Your daily running costs total <strong style={{ color: '#ff4444' }}>KES {totalDailyCost.toFixed(0)}</strong>.
-              Today's profit so far is <strong style={{ color: todayProfit >= 0 ? '#10B981' : '#ff4444' }}>KES {todayProfit.toFixed(0)}</strong>.
+            <p style={{ color: '#aaa', fontSize: '14px', lineHeight: '1.7', marginBottom: '16px' }}>
+              Daily running costs: <strong style={{ color: '#F97316' }}>KES {totalDailyCost.toFixed(0)}</strong>.
+              Today's profit: <strong style={{ color: todayProfit >= 0 ? '#10B981' : '#aaa' }}>KES {todayProfit.toFixed(0)}</strong>.
               {breakEvenGap <= 0
-                ? ` You are KES ${Math.abs(breakEvenGap).toFixed(0)} above your break-even point. Keep going!`
-                : ` You still need KES ${breakEvenGap.toFixed(0)} more profit today to cover your running costs.`
-              }
+                ? ` You are KES ${Math.abs(breakEvenGap).toFixed(0)} above break-even. Great work!`
+                : ` You need KES ${breakEvenGap.toFixed(0)} more profit to cover today's costs.`}
             </p>
+
+            {/* PROGRESS BAR */}
+            <div style={{ background: '#2a2a2a', borderRadius: '999px', height: '10px', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${progressPercent}%`,
+                background: progressPercent >= 100 ? '#10B981' : '#F97316',
+                borderRadius: '999px',
+                transition: 'width 0.5s ease'
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#666' }}>KES 0</span>
+              <span style={{ fontSize: '11px', color: progressPercent >= 100 ? '#10B981' : '#F97316', fontWeight: '600' }}>
+                {progressPercent.toFixed(0)}% covered
+              </span>
+              <span style={{ fontSize: '11px', color: '#666' }}>KES {totalDailyCost.toFixed(0)}</span>
+            </div>
           </div>
         )}
 
@@ -99,19 +116,19 @@ export function OperationalExpenses() {
           <div className="card">
             <div className="card-icon">📅</div>
             <p className="card-label">Daily Cost</p>
-            <p className="card-value" style={{ color: '#ff4444' }}>KES {totalDailyCost.toFixed(0)}</p>
+            <p className="card-value" style={{ color: '#F97316' }}>KES {totalDailyCost.toFixed(0)}</p>
             <p style={{ fontSize: '11px', color: '#666' }}>Must earn this daily to break even</p>
           </div>
           <div className="card">
             <div className="card-icon">📆</div>
             <p className="card-label">Monthly Cost</p>
-            <p className="card-value" style={{ color: '#FFA500' }}>KES {totalMonthly.toLocaleString()}</p>
+            <p className="card-value" style={{ color: '#8B5CF6' }}>KES {totalMonthly.toLocaleString()}</p>
             <p style={{ fontSize: '11px', color: '#666' }}>Total recorded expenses</p>
           </div>
           <div className="card">
             <div className="card-icon">🎯</div>
             <p className="card-label">Today's Profit</p>
-            <p className="card-value" style={{ color: todayProfit >= 0 ? '#10B981' : '#ff4444' }}>
+            <p className="card-value" style={{ color: todayProfit >= 0 ? '#10B981' : '#F97316' }}>
               KES {todayProfit.toFixed(0)}
             </p>
             <p style={{ fontSize: '11px', color: '#666' }}>From today's sales</p>
@@ -120,46 +137,62 @@ export function OperationalExpenses() {
 
         {/* ADD FORM */}
         <div className="entry-form">
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {/* TOGGLE TABS */}
+          <div style={{
+            display: 'flex', background: '#1a1a1a',
+            borderRadius: '10px', padding: '4px',
+            marginBottom: '16px', gap: '4px'
+          }}>
             <button onClick={() => setIsFixed(true)} style={{
-              flex: 1, padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              background: isFixed ? '#ff4444' : 'transparent',
+              flex: 1, padding: '10px', borderRadius: '8px',
+              cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+              background: isFixed ? '#F97316' : 'transparent',
               color: isFixed ? '#fff' : '#aaa',
-              border: isFixed ? 'none' : '1px solid #2a2a2a'
+              border: 'none', transition: 'all 0.2s'
             }}>
-              🏠 Fixed Cost (e.g. rent)
+              🏠 Fixed Cost
             </button>
             <button onClick={() => setIsFixed(false)} style={{
-              flex: 1, padding: '10px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              background: !isFixed ? '#FFA500' : 'transparent',
+              flex: 1, padding: '10px', borderRadius: '8px',
+              cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+              background: !isFixed ? '#8B5CF6' : 'transparent',
               color: !isFixed ? '#fff' : '#aaa',
-              border: !isFixed ? 'none' : '1px solid #2a2a2a'
+              border: 'none', transition: 'all 0.2s'
             }}>
-              🚗 Variable Cost (e.g. transport)
+              🚗 Variable Cost
             </button>
           </div>
 
+          {/* HINT BOX */}
           <div style={{
-            background: isFixed ? '#2b0d0d' : '#1a1a0d',
-            border: `1px solid ${isFixed ? '#ff4444' : '#FFA500'}`,
+            background: isFixed ? '#1a0e00' : '#120d1a',
+            border: `1px solid ${isFixed ? '#F97316' : '#8B5CF6'}`,
             borderRadius: '8px', padding: '12px', marginBottom: '16px',
-            color: isFixed ? '#ff4444' : '#FFA500', fontSize: '13px'
+            color: isFixed ? '#F97316' : '#8B5CF6', fontSize: '13px'
           }}>
             {isFixed
               ? '🏠 Fixed costs are the same every month — rent, electricity, salaries, insurance.'
               : '🚗 Variable costs change day to day — transport, airtime, packaging, casual labour.'}
           </div>
 
+          {/* FORM FIELDS */}
           <div className="form-row">
             <div className="form-field">
               <label>Expense Name</label>
-              <input placeholder={isFixed ? 'e.g. Shop Rent' : 'e.g. Transport to market'}
-                value={item} onChange={e => setItem(e.target.value)} />
+              <input
+                placeholder={isFixed ? 'e.g. Shop Rent' : 'e.g. Transport to market'}
+                value={item}
+                onChange={e => setItem(e.target.value)}
+              />
             </div>
             <div className="form-field">
               <label>Amount (KES)</label>
-              <input type="number" placeholder="e.g. 15000"
-                value={amount} onChange={e => setAmount(e.target.value)} />
+              <input
+                type="number"
+                placeholder="e.g. 15000"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+              />
             </div>
             <div className="form-field">
               <label>How often?</label>
@@ -173,67 +206,116 @@ export function OperationalExpenses() {
           </div>
 
           {amount && (
-            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px' }}>
-              Daily impact: <strong style={{ color: '#ff4444' }}>
+            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '12px' }}>
+              Daily impact: <strong style={{ color: isFixed ? '#F97316' : '#8B5CF6' }}>
                 KES {getDailyAmount(Number(amount), frequency).toFixed(0)}/day
               </strong> — your sales must cover this daily.
             </p>
           )}
 
-          <button className="add-btn" style={{ background: isFixed ? '#ff4444' : '#FFA500' }} onClick={addExpense}>
+          <button className="add-btn" style={{
+            background: isFixed ? '#F97316' : '#8B5CF6',
+            width: '100%'
+          }} onClick={addExpense}>
             + Record {isFixed ? 'Fixed' : 'Variable'} Expense
           </button>
         </div>
 
-        {/* FIXED EXPENSES */}
+        {/* FIXED EXPENSES TABLE */}
         {fixedExpenses.length > 0 && (
           <div className="recent-sales" style={{ marginBottom: '24px' }}>
-            <h3>🏠 Fixed Monthly Costs</h3>
+            <h3 style={{ color: '#F97316', marginBottom: '4px' }}>🏠 Fixed Monthly Costs</h3>
             <p style={{ fontSize: '13px', color: '#aaa', marginBottom: '12px' }}>
               These costs happen every month regardless of sales.
             </p>
-            <table>
-              <thead>
-                <tr><th>Expense</th><th>Amount</th><th>Frequency</th><th>Daily Cost</th><th>Action</th></tr>
-              </thead>
-              <tbody>
-                {fixedExpenses.map(d => (
-                  <tr key={d.id}>
-                    <td>{d.item}</td>
-                    <td style={{ color: '#ff4444', fontWeight: 'bold' }}>KES {d.amount.toLocaleString()}</td>
-                    <td style={{ color: '#aaa', fontSize: '12px' }}>{d.frequency}</td>
-                    <td style={{ color: '#ff4444' }}>KES {getDailyAmount(d.amount, d.frequency).toFixed(0)}/day</td>
-                    <td><button className="delete-btn" onClick={() => deleteExpense(d.id)}>🗑</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* MOBILE CARDS */}
+            <div style={{ display: 'none' }} className="mobile-expense-list">
+              {fixedExpenses.map(d => (
+                <div key={d.id} style={{
+                  background: '#1a0e00', border: '1px solid #F97316',
+                  borderRadius: '10px', padding: '14px', marginBottom: '10px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <p style={{ color: '#fff', fontWeight: '600' }}>{d.item}</p>
+                    <button className="delete-btn" onClick={() => deleteExpense(d.id)}>🗑</button>
+                  </div>
+                  <p style={{ color: '#F97316', fontWeight: '700', fontSize: '18px', margin: '6px 0' }}>
+                    KES {d.amount.toLocaleString()}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '12px' }}>
+                    {d.frequency} · KES {getDailyAmount(d.amount, d.frequency).toFixed(0)}/day
+                  </p>
+                </div>
+              ))}
+            </div>
+            {/* DESKTOP TABLE */}
+            <div className="desktop-expense-table">
+              <table>
+                <thead>
+                  <tr><th>Expense</th><th>Amount</th><th>Frequency</th><th>Daily Cost</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                  {fixedExpenses.map(d => (
+                    <tr key={d.id}>
+                      <td>{d.item}</td>
+                      <td style={{ color: '#F97316', fontWeight: 'bold' }}>KES {d.amount.toLocaleString()}</td>
+                      <td style={{ color: '#aaa', fontSize: '12px' }}>{d.frequency}</td>
+                      <td style={{ color: '#F97316' }}>KES {getDailyAmount(d.amount, d.frequency).toFixed(0)}/day</td>
+                      <td><button className="delete-btn" onClick={() => deleteExpense(d.id)}>🗑</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
-        {/* VARIABLE EXPENSES */}
+        {/* VARIABLE EXPENSES TABLE */}
         {variableExpenses.length > 0 && (
           <div className="recent-sales">
-            <h3>🚗 Variable Costs</h3>
+            <h3 style={{ color: '#8B5CF6', marginBottom: '4px' }}>🚗 Variable Costs</h3>
             <p style={{ fontSize: '13px', color: '#aaa', marginBottom: '12px' }}>
               These costs change depending on your business activity.
             </p>
-            <table>
-              <thead>
-                <tr><th>Expense</th><th>Amount</th><th>Frequency</th><th>Daily Cost</th><th>Action</th></tr>
-              </thead>
-              <tbody>
-                {variableExpenses.map(d => (
-                  <tr key={d.id}>
-                    <td>{d.item}</td>
-                    <td style={{ color: '#FFA500', fontWeight: 'bold' }}>KES {d.amount.toLocaleString()}</td>
-                    <td style={{ color: '#aaa', fontSize: '12px' }}>{d.frequency}</td>
-                    <td style={{ color: '#FFA500' }}>KES {getDailyAmount(d.amount, d.frequency).toFixed(0)}/day</td>
-                    <td><button className="delete-btn" onClick={() => deleteExpense(d.id)}>🗑</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* MOBILE CARDS */}
+            <div style={{ display: 'none' }} className="mobile-expense-list">
+              {variableExpenses.map(d => (
+                <div key={d.id} style={{
+                  background: '#120d1a', border: '1px solid #8B5CF6',
+                  borderRadius: '10px', padding: '14px', marginBottom: '10px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <p style={{ color: '#fff', fontWeight: '600' }}>{d.item}</p>
+                    <button className="delete-btn" onClick={() => deleteExpense(d.id)}>🗑</button>
+                  </div>
+                  <p style={{ color: '#8B5CF6', fontWeight: '700', fontSize: '18px', margin: '6px 0' }}>
+                    KES {d.amount.toLocaleString()}
+                  </p>
+                  <p style={{ color: '#666', fontSize: '12px' }}>
+                    {d.frequency} · KES {getDailyAmount(d.amount, d.frequency).toFixed(0)}/day
+                  </p>
+                </div>
+              ))}
+            </div>
+            {/* DESKTOP TABLE */}
+            <div className="desktop-expense-table">
+              <table>
+                <thead>
+                  <tr><th>Expense</th><th>Amount</th><th>Frequency</th><th>Daily Cost</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                  {variableExpenses.map(d => (
+                    <tr key={d.id}>
+                      <td>{d.item}</td>
+                      <td style={{ color: '#8B5CF6', fontWeight: 'bold' }}>KES {d.amount.toLocaleString()}</td>
+                      <td style={{ color: '#aaa', fontSize: '12px' }}>{d.frequency}</td>
+                      <td style={{ color: '#8B5CF6' }}>KES {getDailyAmount(d.amount, d.frequency).toFixed(0)}/day</td>
+                      <td><button className="delete-btn" onClick={() => deleteExpense(d.id)}>🗑</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

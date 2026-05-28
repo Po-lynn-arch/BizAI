@@ -18,7 +18,9 @@ export function Simulation() {
 
   useEffect(() => {
     fetch(`${API_URL}/api/sales?user_id=${user.id}`)
-    .then(res => res.json()).then(d => setIncome(d))
+      .then(res => res.json())
+      .then(d => setIncome(Array.isArray(d) ? d : []))
+      .catch(() => setIncome([]))
   }, [])
 
   const products = [...new Set(income.map(s => s.product))]
@@ -33,21 +35,26 @@ export function Simulation() {
     setMessages(prev => [...prev, { from: 'user', text: userMsg }])
     setLoading(true)
 
-    const response = await fetch('${API_URL/api/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: user.id,
-        product: selectedProduct,
-        new_price: Number(newPrice),
-        new_qty: Number(newQty)
+    try {
+      const response = await fetch(`${API_URL}/api/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          product: selectedProduct,
+          new_price: Number(newPrice),
+          new_qty: Number(newQty)
+        })
       })
-    })
-    const data = await response.json()
-    setResult(data)
-    setLoading(false)
-    setMessages(prev => [...prev, { from: 'bot', text: data.verdict }])
-    setSelectedProduct(''); setNewPrice(''); setNewQty('')
+      const data = await response.json()
+      setResult(data)
+      setMessages(prev => [...prev, { from: 'bot', text: data.verdict }])
+      setSelectedProduct(''); setNewPrice(''); setNewQty('')
+    } catch {
+      setMessages(prev => [...prev, { from: 'bot', text: '⚠️ Failed to run simulation. Please try again.' }])
+    } finally {
+      setLoading(false)
+    }
   }
 
   function reset() {
@@ -67,7 +74,6 @@ export function Simulation() {
           </div>
         </header>
 
-        {/* CHAT WINDOW */}
         <div style={{
           background: '#111', border: '1px solid #2a2a2a', borderRadius: '12px',
           padding: '20px', marginBottom: '24px', minHeight: '300px',
@@ -96,7 +102,6 @@ export function Simulation() {
           )}
         </div>
 
-        {/* SIMULATION FORM */}
         <div className="sim-form">
           <h3>Configure Simulation</h3>
           <div className="form-row">
@@ -116,26 +121,26 @@ export function Simulation() {
               <input type="number" placeholder="e.g. 100" value={newQty} onChange={e => setNewQty(e.target.value)} />
             </div>
           </div>
-          
+
           {result && (
             <div className="results-grid" style={{ marginBottom: '16px' }}>
               <div className="result-card">
                 <p className="result-label">Original Revenue</p>
-                <p className="result-value">KES {result.original_revenue.toLocaleString()}</p>
+                <p className="result-value">KES {result.original_revenue?.toLocaleString()}</p>
               </div>
               <div className="result-card">
                 <p className="result-label">Projected Revenue</p>
-                <p className="result-value">KES {result.projected_revenue.toLocaleString()}</p>
+                <p className="result-value">KES {result.projected_revenue?.toLocaleString()}</p>
               </div>
               <div className="result-card">
                 <p className="result-label">Projected Profit</p>
                 <p className="result-value" style={{ color: result.projected_profit >= 0 ? '#10B981' : '#ff4444' }}>
-                  KES {result.projected_profit.toLocaleString()}
+                  KES {result.projected_profit?.toLocaleString()}
                 </p>
               </div>
               <div className={`result-card ${result.difference >= 0 ? 'positive' : 'negative'}`}>
                 <p className="result-label">Profit Difference</p>
-                <p className="result-value">{result.difference >= 0 ? '+' : ''}KES {result.difference.toLocaleString()}</p>
+                <p className="result-value">{result.difference >= 0 ? '+' : ''}KES {result.difference?.toLocaleString()}</p>
                 <p className="result-note">{result.percent}% {result.difference >= 0 ? 'increase' : 'decrease'}</p>
               </div>
             </div>
@@ -149,7 +154,7 @@ export function Simulation() {
 
         {products.length === 0 && (
           <div className="recent-sales" style={{ marginTop: '24px' }}>
-            <p className="empty-state">No products found. Add income entries first.</p>
+            <p className="empty-state">No products found. Add sales entries first.</p>
           </div>
         )}
       </div>
