@@ -31,7 +31,7 @@ export function Login() {
 
     try {
       const response = await fetch(
-        '${API_URL}/api/login',
+        `${API_URL}/api/login`,
         {
           method: 'POST',
           headers: {
@@ -78,7 +78,7 @@ export function Login() {
   async function resendVerification() {
     try {
       const res = await fetch(
-        '${API_URL}/api/resend-verification',
+        `${API_URL}/api/resend-verification`,
         {
           method: 'POST',
           headers: {
