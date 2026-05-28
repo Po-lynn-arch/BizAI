@@ -47,7 +47,8 @@ def get_db():
         password=os.environ.get('DB_PASSWORD', ''),
         database=os.environ.get('DB_NAME', 'default_db'),
         port=int(os.environ.get('DB_PORT', 3306)),
-        ssl_disabled=False
+        ssl_disabled = False
+        
     )
 
 

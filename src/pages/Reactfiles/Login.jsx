@@ -31,7 +31,7 @@ export function Login() {
 
     try {
       const response = await fetch(
-        '${API_URL/api/login',
+        '${API_URL}/api/login',
         {
           method: 'POST',
           headers: {
@@ -78,7 +78,7 @@ export function Login() {
   async function resendVerification() {
     try {
       const res = await fetch(
-        '${API_URL/api/resend-verification',
+        '${API_URL}/api/resend-verification',
         {
           method: 'POST',
           headers: {
@@ -127,6 +127,7 @@ export function Login() {
             onChange={e =>
               setEmail(e.target.value)
             }
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
           />
         </div>
 
@@ -150,6 +151,7 @@ export function Login() {
                 paddingRight: '60px',
                 boxSizing: 'border-box'
               }}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
             />
 
             <span
