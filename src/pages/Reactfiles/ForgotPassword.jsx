@@ -16,7 +16,8 @@ export function ForgotPassword() {
     if (!email) { setError('Please enter your email address'); return }
     setLoading(true)
     try {
-      const res = await fetch('${API_URL/api/forgot-password', {
+      // ✅ Fixed broken template literal: was '${API_URL/api/...' (missing backtick + closing brace)
+      const res = await fetch(`${API_URL}/api/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })

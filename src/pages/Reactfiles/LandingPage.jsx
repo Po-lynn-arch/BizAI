@@ -1,5 +1,82 @@
 import '../CSS/LandingPage.css'
 import { useNavigate } from 'react-router-dom'
+// ✅ Memoized with React.memo to prevent unnecessary re-renders if parent ever re-renders
+import { memo } from 'react'
+
+// ✅ Split heavy sections into memoized sub-components so they don't re-render on navigate state changes
+const FeaturesSection = memo(function FeaturesSection() {
+  return (
+    <section className="features-section" id="features">
+      <div className="section-header">
+        <p className="features-label">WHAT WE OFFER</p>
+        <h2>Everything your business needs</h2>
+        <p className="section-sub">No IT expertise required. No expensive software. Just results.</p>
+      </div>
+      <div className="features-grid">
+        <div className="feature-card">
+          <div className="feature-icon-wrap">📦</div>
+          <h3>Stock Management</h3>
+          <p>Add your products, set how long your stock lasts, and let BizAI automatically track what's left as you sell. Get alerts before you run out.</p>
+          <ul className="feature-list">
+            <li>✅ Track units remaining</li>
+            <li>✅ Colour-coded alerts</li>
+            <li>✅ Days of stock remaining</li>
+          </ul>
+        </div>
+        <div className="feature-card">
+          <div className="feature-icon-wrap">📝</div>
+          <h3>Sales Recording</h3>
+          <p>Record every sale in seconds. The system instantly calculates your profit per sale, deducts from stock, and updates your dashboard.</p>
+          <ul className="feature-list">
+            <li>✅ Real-time profit preview</li>
+            <li>✅ Auto stock deduction</li>
+            <li>✅ Daily sales summary</li>
+          </ul>
+        </div>
+        <div className="feature-card">
+          <div className="feature-icon-wrap">🤖</div>
+          <h3>AI Demand Predictions</h3>
+          <p>Our machine learning model studies your sales history and predicts which products will sell most next month so you stock up at the right time.</p>
+          <ul className="feature-list">
+            <li>✅ Random Forest ML model</li>
+            <li>✅ Top 3 product forecast</li>
+            <li>✅ Accuracy metrics shown</li>
+          </ul>
+        </div>
+        <div className="feature-card">
+          <div className="feature-icon-wrap">🧪</div>
+          <h3>Business Simulation</h3>
+          <p>Ask your AI advisor: "What if I sell Milk at KES 90 instead of KES 80?" Get an instant answer before making any real decision.</p>
+          <ul className="feature-list">
+            <li>✅ Chat-style interface</li>
+            <li>✅ Profit impact analysis</li>
+            <li>✅ Revenue comparison</li>
+          </ul>
+        </div>
+        <div className="feature-card">
+          <div className="feature-icon-wrap">📄</div>
+          <h3>Automated Reports</h3>
+          <p>Get daily and weekly reports showing income, stock costs, operational expenses, and net profit — all calculated automatically.</p>
+          <ul className="feature-list">
+            <li>✅ Daily profit tracking</li>
+            <li>✅ Weekly revenue trends</li>
+            <li>✅ Income vs expense charts</li>
+          </ul>
+        </div>
+        <div className="feature-card">
+          <div className="feature-icon-wrap">🏠</div>
+          <h3>Expense Tracking</h3>
+          <p>Record rent, transport, electricity and other operational costs. BizAI spreads them correctly so your daily profit is always accurate.</p>
+          <ul className="feature-list">
+            <li>✅ Daily, weekly, monthly costs</li>
+            <li>✅ Smart profit calculation</li>
+            <li>✅ Cost breakdown charts</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  )
+})
 
 export function LandingPage() {
   const navigate = useNavigate()
@@ -60,76 +137,8 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="features-section" id="features">
-        <div className="section-header">
-          <p className="features-label">WHAT WE OFFER</p>
-          <h2>Everything your business needs</h2>
-          <p className="section-sub">No IT expertise required. No expensive software. Just results.</p>
-        </div>
-        <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon-wrap">📦</div>
-            <h3>Stock Management</h3>
-            <p>Add your products, set how long your stock lasts, and let BizAI automatically track what's left as you sell. Get alerts before you run out.</p>
-            <ul className="feature-list">
-              <li>✅ Track units remaining</li>
-              <li>✅ Colour-coded alerts</li>
-              <li>✅ Days of stock remaining</li>
-            </ul>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon-wrap">📝</div>
-            <h3>Sales Recording</h3>
-            <p>Record every sale in seconds. The system instantly calculates your profit per sale, deducts from stock, and updates your dashboard.</p>
-            <ul className="feature-list">
-              <li>✅ Real-time profit preview</li>
-              <li>✅ Auto stock deduction</li>
-              <li>✅ Daily sales summary</li>
-            </ul>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon-wrap">🤖</div>
-            <h3>AI Demand Predictions</h3>
-            <p>Our machine learning model studies your sales history and predicts which products will sell most next month so you stock up at the right time.</p>
-            <ul className="feature-list">
-              <li>✅ Random Forest ML model</li>
-              <li>✅ Top 3 product forecast</li>
-              <li>✅ Accuracy metrics shown</li>
-            </ul>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon-wrap">🧪</div>
-            <h3>Business Simulation</h3>
-            <p>Ask your AI advisor: "What if I sell Milk at KES 90 instead of KES 80?" Get an instant answer before making any real decision.</p>
-            <ul className="feature-list">
-              <li>✅ Chat-style interface</li>
-              <li>✅ Profit impact analysis</li>
-              <li>✅ Revenue comparison</li>
-            </ul>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon-wrap">📄</div>
-            <h3>Automated Reports</h3>
-            <p>Get daily and weekly reports showing income, stock costs, operational expenses, and net profit — all calculated automatically.</p>
-            <ul className="feature-list">
-              <li>✅ Daily profit tracking</li>
-              <li>✅ Weekly revenue trends</li>
-              <li>✅ Income vs expense charts</li>
-            </ul>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon-wrap">🏠</div>
-            <h3>Expense Tracking</h3>
-            <p>Record rent, transport, electricity and other operational costs. BizAI spreads them correctly so your daily profit is always accurate.</p>
-            <ul className="feature-list">
-              <li>✅ Daily, weekly, monthly costs</li>
-              <li>✅ Smart profit calculation</li>
-              <li>✅ Cost breakdown charts</li>
-            </ul>
-          </div>
-        </div>
-      </section>
+      {/* ✅ Memoized heavy section — won't re-render unless its own props change */}
+      <FeaturesSection />
 
       {/* HOW IT WORKS */}
       <section className="how-section" id="how-it-works">

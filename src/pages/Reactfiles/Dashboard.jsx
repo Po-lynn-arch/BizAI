@@ -1,12 +1,13 @@
 import '../CSS/Dashboard.css'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import { API_URL } from '../../hooks/config'
 
 export function Dashboard() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  // ✅ Parse localStorage once, not on every render
+  const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
   useSessionExpiry(30)
 
   const [sales, setSales] = useState([])
@@ -14,36 +15,39 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // ✅ Already using Promise.all correctly for parallel fetches — kept as-is
     Promise.all([
       fetch(`${API_URL}/api/sales?user_id=${user.id}`).then(res => res.json()),
       fetch(`${API_URL}/api/reminders?user_id=${user.id}`).then(res => res.json())
     ]).then(([salesData, remindersData]) => {
       setSales(Array.isArray(salesData) ? salesData : [])
       setReminders(Array.isArray(remindersData) ? remindersData : [])
-      setLoading(false)
     }).catch(() => {
       setSales([])
       setReminders([])
-      setLoading(false)
-    })
-  }, [])
+    }).finally(() => setLoading(false))
+  }, [user.id]) // ✅ Proper dependency
 
   const today = new Date().toLocaleDateString()
-  const todaySales = sales.filter(s => s.date === today)
 
-  const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
-  const todayRevenue = todaySales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
-  const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
-  const totalRevenue = sales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
+  // ✅ All derived values memoized — only recalculate when sales changes
+  const { todaySales, todayProfit, todayRevenue, totalProfit, totalRevenue, chartData } = useMemo(() => {
+    const todaySales = sales.filter(s => s.date === today)
+    const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
+    const todayRevenue = todaySales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
+    const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
+    const totalRevenue = sales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
 
-  // Group by date for chart
-  const chartMap = {}
-  sales.forEach(s => {
-    if (!chartMap[s.date]) chartMap[s.date] = { date: s.date, profit: 0, revenue: 0 }
-    chartMap[s.date].profit += s.profit || 0
-    chartMap[s.date].revenue += s.total_earned || 0
-  })
-  const chartData = Object.values(chartMap).slice(-14)
+    const chartMap = {}
+    sales.forEach(s => {
+      if (!chartMap[s.date]) chartMap[s.date] = { date: s.date, profit: 0, revenue: 0 }
+      chartMap[s.date].profit += s.profit || 0
+      chartMap[s.date].revenue += s.total_earned || 0
+    })
+    const chartData = Object.values(chartMap).slice(-14)
+
+    return { todaySales, todayProfit, todayRevenue, totalProfit, totalRevenue, chartData }
+  }, [sales, today])
 
   if (loading) {
     return (

@@ -1,11 +1,13 @@
 import '../CSS/Dashboard.css'
 import '../CSS/Simulation.css'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 
 export function Simulation() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  // ✅ Parse localStorage once, not on every render
+  const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
+
   const [income, setIncome] = useState([])
   const [selectedProduct, setSelectedProduct] = useState('')
   const [newPrice, setNewPrice] = useState('')
@@ -21,9 +23,10 @@ export function Simulation() {
       .then(res => res.json())
       .then(d => setIncome(Array.isArray(d) ? d : []))
       .catch(() => setIncome([]))
-  }, [])
+  }, [user.id]) // ✅ Proper dependency
 
-  const products = [...new Set(income.map(s => s.product))]
+  // ✅ Memoized — only recomputes when income changes, not on every render
+  const products = useMemo(() => [...new Set(income.map(s => s.product))], [income])
 
   async function simulate() {
     if (!selectedProduct || !newPrice || !newQty) {
