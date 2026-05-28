@@ -52,7 +52,7 @@ export function Dashboard() {
         <header style={styles.topbar}>
           <div>
             <h2 style={styles.pageTitle}>Dashboard</h2>
-            <p style={styles.pageSubtitle}>Welcome back, <strong style={{ color: '#fff' }}>{user.name}</strong></p>
+            <p style={styles.pageSubtitle}>Welcome back, <strong style={{ color: '#fff' }}>{user.businessName}</strong></p>
           </div>
           <div style={styles.dateBadge}>
             {new Date().toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -184,8 +184,8 @@ const styles = {
     marginBottom: '28px', paddingBottom: '20px',
     borderBottom: '1px solid #1e293b',
   },
-  pageTitle: { fontSize: '22px', fontWeight: '700', color: '#f1f5f9', margin: 0 },
-  pageSubtitle: { fontSize: '13px', color: '#64748b', margin: '4px 0 0', fontWeight: 400 },
+  pageTitle: { fontSize: '22px', fontWeight: '700', color: '#f1f5f9', margin: 0, alignItems: 'center' },
+  pageSubtitle: { fontSize: '15px', color: '#64748b', margin: '4px 0 0', fontWeight: 400, alignItems: 'center' },
   dateBadge: {
     background: '#1e293b', color: '#94a3b8', fontSize: '12px',
     padding: '6px 12px', borderRadius: '20px', fontWeight: '500',
