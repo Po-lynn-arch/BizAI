@@ -1,43 +1,23 @@
 import '../CSS/Dashboard.css'
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
-import { API_URL } from '../../hooks/config'
+import { useBusinessData } from '../../hooks/useBusinessData'
 
 export function Dashboard() {
-  // ✅ Parse localStorage once, not on every render
   const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
   useSessionExpiry(30)
 
-  const [sales, setSales] = useState([])
-  const [reminders, setReminders] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // ✅ Already using Promise.all correctly for parallel fetches — kept as-is
-    Promise.all([
-      fetch(`${API_URL}/api/sales?user_id=${user.id}`).then(res => res.json()),
-      fetch(`${API_URL}/api/reminders?user_id=${user.id}`).then(res => res.json())
-    ]).then(([salesData, remindersData]) => {
-      setSales(Array.isArray(salesData) ? salesData : [])
-      setReminders(Array.isArray(remindersData) ? remindersData : [])
-    }).catch(() => {
-      setSales([])
-      setReminders([])
-    }).finally(() => setLoading(false))
-  }, [user.id]) // ✅ Proper dependency
+  const { sales, reminders, loading } = useBusinessData(user.id)
 
   const today = new Date().toLocaleDateString()
 
-  // ✅ All derived values memoized — only recalculate when sales changes
-  const { todaySales, todayProfit, todayRevenue, totalProfit, totalRevenue, chartData } = useMemo(() => {
+  const { todaySales, todayProfit, totalProfit, totalRevenue, chartData } = useMemo(() => {
     const todaySales = sales.filter(s => s.date === today)
     const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
-    const todayRevenue = todaySales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
     const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
     const totalRevenue = sales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
-
     const chartMap = {}
     sales.forEach(s => {
       if (!chartMap[s.date]) chartMap[s.date] = { date: s.date, profit: 0, revenue: 0 }
@@ -45,20 +25,16 @@ export function Dashboard() {
       chartMap[s.date].revenue += s.total_earned || 0
     })
     const chartData = Object.values(chartMap).slice(-14)
-
-    return { todaySales, todayProfit, todayRevenue, totalProfit, totalRevenue, chartData }
+    return { todaySales, todayProfit, totalProfit, totalRevenue, chartData }
   }, [sales, today])
 
-  if (loading) {
-    return (
-      <div className="dashboard">
-        <Sidebar />
-        <div className="main-content-area">
-          <p style={{ color: '#aaa', padding: '40px' }}>Loading dashboard...</p>
-        </div>
+  if (loading) return (
+    <div className="dashboard"><Sidebar />
+      <div className="main-content-area">
+        <p style={{ color: '#aaa', padding: '40px' }}>Loading dashboard...</p>
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
     <div className="dashboard">
@@ -91,7 +67,6 @@ export function Dashboard() {
               {todayProfit >= 0 ? '✅ Profitable today' : '⚠️ Not profitable today'}
             </p>
           </div>
-
           <div className="card">
             <p className="card-label">Total Profit (All Time)</p>
             <p className="card-value" style={{ color: totalProfit >= 0 ? '#10B981' : '#ff4444' }}>
@@ -101,12 +76,10 @@ export function Dashboard() {
               Revenue: KES {totalRevenue.toLocaleString()}
             </p>
           </div>
-
           <div className="card">
             <p className="card-label">Total Transactions</p>
             <p className="card-value">{sales.length}</p>
           </div>
-
           <div className="card">
             <p className="card-label">Today's Sales</p>
             <p className="card-value">{todaySales.length}</p>
@@ -143,7 +116,6 @@ export function Dashboard() {
             </p>
           )}
         </div>
-
       </div>
     </div>
   )

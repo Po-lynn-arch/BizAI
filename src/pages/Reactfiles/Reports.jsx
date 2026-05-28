@@ -1,36 +1,13 @@
 import '../CSS/Dashboard.css'
-import { useState, useEffect } from 'react'
-import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid
-} from 'recharts'
+import { useState, useMemo } from 'react'
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
-import { API_URL } from '../../hooks/config'
-
+import { useBusinessData } from '../../hooks/useBusinessData'
 
 export function Reports() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
-  const [sales, setSales] = useState([])
-  const [expenses, setExpenses] = useState([])
-  const [weekly, setWeekly] = useState(null)
-  const [tab, setTab] = useState('overview') // 'overview' or 'weekly'
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      fetch(`${API_URL}/api/sales?user_id=${user.id}`).then(r => r.json()),
-      fetch(`${API_URL}/api/operational-expenses?user_id=${user.id}`).then(r => r.json()),
-      fetch(`${API_URL}/api/weekly-report?user_id=${user.id}`).then(r => r.json())
-    ]).then(([salesData, expensesData, weeklyData]) => {
-      setSales(Array.isArray(salesData) ? salesData : [])
-      setExpenses(Array.isArray(expensesData) ? expensesData : [])
-      setWeekly(weeklyData)
-      setLoading(false)
-    }).catch(err => {
-      console.error('Failed to load reports:', err)
-      setLoading(false)
-    })
-  }, [])
+  const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
+  const { sales, expenses, weekly, loading } = useBusinessData(user.id)
+  const [tab, setTab] = useState('overview')
 
   const today = new Date().toLocaleDateString()
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
@@ -49,18 +26,15 @@ export function Reports() {
     productMap[s.product].qty += s.qty_sold || 0
   })
   const barData = Object.entries(productMap).map(([product, v]) => ({ product, revenue: v.revenue, profit: v.profit }))
-
   const pieData = [
     { name: 'Gross Profit', value: Math.max(0, totalProfit) },
     { name: 'Operational Expenses', value: totalExpenses }
   ]
-  const COLORS = ['#10B981', '#ff4444']
-
+  const COLORS = ['#10B981', '#F97316']
   const bestDay = weekly?.daily?.reduce((best, d) => d.profit > (best?.profit || -Infinity) ? d : best, null)
 
   if (loading) return (
-    <div className="dashboard">
-      <Sidebar />
+    <div className="dashboard"><Sidebar />
       <div className="main-content-area" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#aaa' }}>Loading reports...</p>
       </div>
@@ -76,7 +50,6 @@ export function Reports() {
           <p>Business performance overview</p>
         </header>
 
-        {/* Tab toggle */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           {[['overview', '📊 Overview'], ['weekly', '📅 Weekly']].map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)} style={{
