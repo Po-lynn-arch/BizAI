@@ -11,24 +11,26 @@ export function Dashboard() {
 
   const [sales, setSales] = useState([])
   const [reminders, setReminders] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       fetch(`${API_URL}/api/sales?user_id=${user.id}`).then(res => res.json()),
-
       fetch(`${API_URL}/api/reminders?user_id=${user.id}`).then(res => res.json())
     ]).then(([salesData, remindersData]) => {
-      setSales(salesData),
-      setReminders(remindersData)
+      setSales(Array.isArray(salesData) ? salesData : [])
+      setReminders(Array.isArray(remindersData) ? remindersData : [])
+      setLoading(false)
+    }).catch(() => {
+      setSales([])
+      setReminders([])
+      setLoading(false)
     })
-   
   }, [])
 
   const today = new Date().toLocaleDateString()
   const todaySales = sales.filter(s => s.date === today)
 
-  // profit is stored per sale row: (selling_price - cost_per_unit) * qty
-  // just sum it up — no stock cost subtraction needed here
   const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
   const todayRevenue = todaySales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
   const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
@@ -41,7 +43,18 @@ export function Dashboard() {
     chartMap[s.date].profit += s.profit || 0
     chartMap[s.date].revenue += s.total_earned || 0
   })
-  const chartData = Object.values(chartMap).slice(-14) // last 14 days
+  const chartData = Object.values(chartMap).slice(-14)
+
+  if (loading) {
+    return (
+      <div className="dashboard">
+        <Sidebar />
+        <div className="main-content-area">
+          <p style={{ color: '#aaa', padding: '40px' }}>Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="dashboard">
@@ -67,11 +80,11 @@ export function Dashboard() {
           <div className="card">
             <div className="card-icon">📊</div>
             <p className="card-label">Today's Profit</p>
-            <p className="card-value" style={{ color: summary.today_profit >= 0 ? '#10B981' : '#ff4444' }}>
-              KES {summary.today_profit.toLocaleString()}
+            <p className="card-value" style={{ color: todayProfit >= 0 ? '#10B981' : '#ff4444' }}>
+              KES {todayProfit.toLocaleString()}
             </p>
-            <p style={{ fontSize: '11px', color: summary.today_profit >= 0 ? '#10B981' : '#ff4444' }}>
-              {summary.today_profit >= 0 ? '✅ Profitable today' : '⚠️ Not profitable today'}
+            <p style={{ fontSize: '11px', color: todayProfit >= 0 ? '#10B981' : '#ff4444' }}>
+              {todayProfit >= 0 ? '✅ Profitable today' : '⚠️ Not profitable today'}
             </p>
           </div>
 
@@ -80,7 +93,9 @@ export function Dashboard() {
             <p className="card-value" style={{ color: totalProfit >= 0 ? '#10B981' : '#ff4444' }}>
               KES {totalProfit.toLocaleString()}
             </p>
-            <p style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>Revenue: KES {totalRevenue.toLocaleString()}</p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
+              Revenue: KES {totalRevenue.toLocaleString()}
+            </p>
           </div>
 
           <div className="card">
@@ -107,15 +122,16 @@ export function Dashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+
         <div style={{
-          background: summary.total_profit >= 0 ? '#0d2b1f' : '#2b0d0d',
-          border: `1px solid ${summary.total_profit >= 0 ? '#10B981' : '#ff4444'}`,
+          background: totalProfit >= 0 ? '#0d2b1f' : '#2b0d0d',
+          border: `1px solid ${totalProfit >= 0 ? '#10B981' : '#ff4444'}`,
           borderRadius: '12px', padding: '16px', marginBottom: '24px', fontSize: '14px'
         }}>
-          {summary.total_profit >= 0 ? (
+          {totalProfit >= 0 ? (
             <p style={{ color: '#10B981' }}>
-              ✅ <strong>Your business is profitable!</strong> You have made KES {summary.total_profit.toLocaleString()} profit from your sales so far.
-              {summary.today_profit > 0 && ` Today alone you made KES ${summary.today_profit.toLocaleString()}.`}
+              ✅ <strong>Your business is profitable!</strong> You have made KES {totalProfit.toLocaleString()} profit from your sales so far.
+              {todayProfit > 0 && ` Today alone you made KES ${todayProfit.toLocaleString()}.`}
             </p>
           ) : (
             <p style={{ color: '#ff4444' }}>
@@ -123,6 +139,7 @@ export function Dashboard() {
             </p>
           )}
         </div>
+
       </div>
     </div>
   )
