@@ -54,7 +54,7 @@ export function Register() {
       const data = await response.json()
       if (response.ok) {
         if (mode === 'new') {
-          setSuccess(`Your account has been created successfully.Please check your email inbox and click the verification link before logging in.If you don't see the email, check your spam folder.\n\nYour business code is: ${data.business_code}\n\nShare this code with your second user to let them join.`)
+          setSuccess(`Your account has been created successfully.\n\nYour business code is: ${data.business_code}\n\nShare this code with your second user to let them join.`)
         } else {
           navigate('/login')
         }
