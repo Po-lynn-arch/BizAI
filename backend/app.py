@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_mail import Mail, Message
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from itsdangerous import URLSafeTimedSerializer
 import random, string, os
 from datetime import datetime, timedelta
 import threading
@@ -38,7 +38,7 @@ LOCK_MINUTES = 10
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 # ========================
-# CONNECTION POOL
+# CONNECTION POOL — fixes slowness
 # ========================
 db_pool = None
 
@@ -60,8 +60,6 @@ def init_pool():
     except Exception as e:
         print(f'[BizAI] Pool creation failed: {e}')
 
-def generate_code():
-    return 'BIZAI ' + ''.join(random.choices(string.digits, k=4))
 
 def get_db():
     if db_pool:
@@ -74,6 +72,10 @@ def get_db():
         port=int(os.environ.get('DB_PORT', 3306)),
         ssl_disabled=False
     )
+
+
+def generate_code():
+    return 'BIZAI-' + ''.join(random.choices(string.digits, k=4))
 
 
 def get_today():
@@ -99,7 +101,7 @@ def init_db():
             host=os.environ.get('DB_HOST', 'localhost'),
             user=os.environ.get('DB_USER', 'root'),
             password=os.environ.get('DB_PASSWORD', ''),
-            database=os.environ.get('DB_NAME', 'bizai'),
+            database=os.environ.get('DB_NAME', 'default_db'),  # ← FIXED: was 'bizai'
             port=int(os.environ.get('DB_PORT', 3306)),
             ssl_disabled=False
         )
@@ -209,12 +211,17 @@ def register():
         code = generate_code()
         cursor.execute('INSERT INTO businesses (name, code) VALUES (%s,%s)', (business_name, code))
         business_id = cursor.lastrowid
-        # ✅ is_verified=True — email verification disabled for Render free tier
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
             (name, email, generate_password_hash(password), 'admin', business_id, True)
         )
         conn.commit()
+
+        threading.Thread(target=send_email, args=(
+            'Welcome to BizAI!', [email],
+            f"Hi {name},\n\nYour BizAI account has been created successfully.\n\nYour business code is: {code}\n\nShare this code with your second user to let them join your business.\n\nBizAI Team"
+        ), daemon=True).start()
+
         return jsonify({
             'message': 'Account created successfully! You can now log in.',
             'business_code': code
@@ -233,10 +240,8 @@ def register():
 def verify_email(token):
     try:
         email = serializer.loads(token, salt='verify-email', max_age=86400)
-    except SignatureExpired:
-        return jsonify({'error': 'Verification link has expired. Please request a new one.'}), 400
-    except BadSignature:
-        return jsonify({'error': 'Invalid verification link.'}), 400
+    except Exception:
+        return jsonify({'error': 'Invalid or expired link'}), 400
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('UPDATE users SET is_verified=TRUE WHERE email=%s', (email,))
@@ -273,11 +278,7 @@ def login():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        '''SELECT u.id, u.name, u.email, u.password, u.role, u.business_id,
-                  u.is_verified, u.failed_attempts, u.locked_until, b.name as business_name
-           FROM users u
-           LEFT JOIN businesses b ON u.business_id = b.id
-           WHERE u.email=%s''',
+        'SELECT id,name,email,password,role,business_id,is_verified,failed_attempts,locked_until FROM users WHERE email=%s',
         (email,)
     )
     user = cursor.fetchone()
@@ -289,11 +290,6 @@ def login():
     if user[8] and user[8] > datetime.now():
         conn.close()
         return jsonify({'error': f'Account locked. Try again after {LOCK_MINUTES} minutes.'}), 403
-
-    # ✅ Email verification disabled for Render free tier — uncomment when on paid host
-    # if not user[6]:
-    #     conn.close()
-    #     return jsonify({'error': 'Please verify your email before logging in. Check your inbox.'}), 403
 
     if not check_password_hash(user[3], password):
         new_attempts = user[7] + 1
@@ -315,14 +311,7 @@ def login():
     conn.close()
     return jsonify({
         'message': 'Login successful',
-        'user': {
-            'id': user[0],
-            'name': user[1],
-            'email': user[2],
-            'role': user[4],
-            'business_id': user[5],
-            'business_name': user[9]
-        }
+        'user': {'id': user[0], 'name': user[1], 'email': user[2], 'role': user[4], 'business_id': user[5]}
     })
 
 
@@ -350,10 +339,8 @@ def forgot_password():
 def reset_password(token):
     try:
         email = serializer.loads(token, salt='reset-password', max_age=3600)
-    except SignatureExpired:
-        return jsonify({'error': 'Reset link has expired. Please request a new one.'}), 400
-    except BadSignature:
-        return jsonify({'error': 'Invalid reset link.'}), 400
+    except Exception:
+        return jsonify({'error': 'Invalid or expired token'}), 400
     new_password = request.get_json().get('password', '')
     if len(new_password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
@@ -392,7 +379,6 @@ def join_business():
         conn.close()
         return jsonify({'error': 'This business already has the maximum of 2 users'}), 400
     try:
-        # ✅ is_verified=True — email verification disabled for Render free tier
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
             (name, email, generate_password_hash(password), 'user', business_id, True)
@@ -736,7 +722,7 @@ def get_summary():
 
 
 # ========================
-# WEEKLY REPORT — 1 query instead of 7
+# WEEKLY REPORT — optimized to 3 queries instead of 7
 # ========================
 
 @app.route('/api/weekly-report', methods=['GET'])

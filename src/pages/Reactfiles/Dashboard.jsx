@@ -49,10 +49,15 @@ export function Dashboard() {
       <div className="main-content-area">
 
         {/* TOPBAR */}
-        <header style={styles.topbar}>
+       <header style={styles.topbar}>
           <div>
             <h2 style={styles.pageTitle}>Dashboard</h2>
-            <p style={styles.pageSubtitle}>Welcome back, <strong style={{ color: '#fff' }}>{user.business_name || user.name}</strong></p>
+            <p style={styles.pageSubtitle}>Welcome back, <strong style={{ color: '#fff' }}>{user.name}</strong></p>
+            {user.business_name && (
+              <p style={{ color: '#10B981', fontSize: '13px', margin: '2px 0 0 0', fontWeight: '600' }}>
+                🏪 {user.business_name}
+              </p>
+            )}
           </div>
           <div style={styles.dateBadge}>
             {new Date().toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' })}
