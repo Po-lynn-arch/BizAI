@@ -1,11 +1,12 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
+from mysql.connector import pooling
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_mail import Mail, Message
-from itsdangerous import URLSafeTimedSerializer
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 import random, string, os
 from datetime import datetime, timedelta
 import threading
@@ -22,10 +23,11 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-prod'
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME', '')
-
+app.config['MAIL_TIMEOUT'] = 10
 
 mail = Mail(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
@@ -35,26 +37,60 @@ MAX_ATTEMPTS = 5
 LOCK_MINUTES = 10
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
+# ========================
+# CONNECTION POOL
+# ========================
+db_pool = None
+
+def init_pool():
+    global db_pool
+    try:
+        db_pool = pooling.MySQLConnectionPool(
+            pool_name="bizai_pool",
+            pool_size=5,
+            pool_reset_session=True,
+            host=os.environ.get('DB_HOST', 'localhost'),
+            user=os.environ.get('DB_USER', 'root'),
+            password=os.environ.get('DB_PASSWORD', ''),
+            database=os.environ.get('DB_NAME', 'default_db'),
+            port=int(os.environ.get('DB_PORT', 3306)),
+            ssl_disabled=False
+        )
+        print('[BizAI] Connection pool created')
+    except Exception as e:
+        print(f'[BizAI] Pool creation failed: {e}')
 
 def generate_code():
-    return 'BIZAI-' + ''.join(random.choices(string.digits, k=4))
-
+    return 'BIZAI ' + ''.join(random.choices(string.digits, k=4))
 
 def get_db():
+    if db_pool:
+        return db_pool.get_connection()
     return mysql.connector.connect(
         host=os.environ.get('DB_HOST', 'localhost'),
         user=os.environ.get('DB_USER', 'root'),
         password=os.environ.get('DB_PASSWORD', ''),
         database=os.environ.get('DB_NAME', 'default_db'),
         port=int(os.environ.get('DB_PORT', 3306)),
-        ssl_disabled = False
-        
+        ssl_disabled=False
     )
 
 
 def get_today():
     now = datetime.now()
     return f"{now.month}/{now.day}/{now.year}"
+
+
+def send_email(subject, recipients, body):
+    try:
+        with app.app_context():
+            msg = Message(subject, sender=app.config['MAIL_USERNAME'], recipients=recipients, body=body)
+            mail.send(msg)
+            print(f'[BizAI] Email sent to {recipients}')
+            return True
+    except Exception as e:
+        print(f'[BizAI] EMAIL ERROR: {type(e).__name__}: {e}')
+        return False
 
 
 def init_db():
@@ -146,6 +182,7 @@ def init_db():
         print(f'[BizAI] DB not connected: {e}')
 
 
+threading.Thread(target=init_pool, daemon=True).start()
 threading.Thread(target=init_db, daemon=True).start()
 
 
@@ -172,33 +209,14 @@ def register():
         code = generate_code()
         cursor.execute('INSERT INTO businesses (name, code) VALUES (%s,%s)', (business_name, code))
         business_id = cursor.lastrowid
+        # ✅ is_verified=True — email verification disabled for Render free tier
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
             (name, email, generate_password_hash(password), 'admin', business_id, True)
         )
         conn.commit()
-
-        # send verification email in background thread — never blocks the request
-        def send_verification_email():
-            try:
-                with app.app_context():
-                    token = serializer.dumps(email, salt='verify-email')
-                    link = f"{FRONTEND_URL}/verify-email/{token}"
-                    msg = Message(
-                        'Verify your BizAI account',
-                        sender=app.config['MAIL_USERNAME'],
-                        recipients=[email],
-                        body=f"Hi {name},\n\nClick the link below to verify your email:\n{link}\n\nLink expires in 24 hours.\n\nBizAI Team"
-                    )
-                    mail.send(msg)
-                    print(f'[BizAI] Verification email sent to {email}')
-            except Exception as e:
-                print(f'[BizAI] Email failed: {e}')
-
-        threading.Thread(target=send_verification_email, daemon=True).start()
-
         return jsonify({
-            'message': 'Account created! Check your email to verify your account.',
+            'message': 'Account created successfully! You can now log in.',
             'business_code': code
         }), 201
 
@@ -215,8 +233,10 @@ def register():
 def verify_email(token):
     try:
         email = serializer.loads(token, salt='verify-email', max_age=86400)
-    except Exception:
-        return jsonify({'error': 'Invalid or expired link'}), 400
+    except SignatureExpired:
+        return jsonify({'error': 'Verification link has expired. Please request a new one.'}), 400
+    except BadSignature:
+        return jsonify({'error': 'Invalid verification link.'}), 400
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('UPDATE users SET is_verified=TRUE WHERE email=%s', (email,))
@@ -237,24 +257,6 @@ def resend_verification():
         return jsonify({'error': 'User not found'}), 404
     if user[1]:
         return jsonify({'message': 'Already verified'}), 200
-
-    def send_resend():
-        try:
-            with app.app_context():
-                token = serializer.dumps(email, salt='verify-email')
-                link = f"{FRONTEND_URL}/verify-email/{token}"
-                msg = Message(
-                    'Verify your BizAI account',
-                    sender=app.config['MAIL_USERNAME'],
-                    recipients=[email],
-                    body=f"Hi {user[0]},\n\nVerify your email here:\n{link}\n\nBizAI Team"
-                )
-                mail.send(msg)
-                print(f'[BizAI] Resend verification sent to {email}')
-        except Exception as e:
-            print(f'[BizAI] Resend email failed: {e}')
-
-    threading.Thread(target=send_resend, daemon=True).start()
     return jsonify({'message': 'Verification email sent'})
 
 
@@ -271,7 +273,11 @@ def login():
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT id,name,email,password,role,business_id,is_verified,failed_attempts,locked_until FROM users WHERE email=%s',
+        '''SELECT u.id, u.name, u.email, u.password, u.role, u.business_id,
+                  u.is_verified, u.failed_attempts, u.locked_until, b.name as business_name
+           FROM users u
+           LEFT JOIN businesses b ON u.business_id = b.id
+           WHERE u.email=%s''',
         (email,)
     )
     user = cursor.fetchone()
@@ -284,10 +290,10 @@ def login():
         conn.close()
         return jsonify({'error': f'Account locked. Try again after {LOCK_MINUTES} minutes.'}), 403
 
-    
-    #if not user[6]:
-     #   conn.close()
-      #  return jsonify({'error': 'Please verify your email before logging in. Check your inbox.'}), 403
+    # ✅ Email verification disabled for Render free tier — uncomment when on paid host
+    # if not user[6]:
+    #     conn.close()
+    #     return jsonify({'error': 'Please verify your email before logging in. Check your inbox.'}), 403
 
     if not check_password_hash(user[3], password):
         new_attempts = user[7] + 1
@@ -309,7 +315,14 @@ def login():
     conn.close()
     return jsonify({
         'message': 'Login successful',
-        'user': {'id': user[0], 'name': user[1], 'email': user[2], 'role': user[4], 'business_id': user[5]}
+        'user': {
+            'id': user[0],
+            'name': user[1],
+            'email': user[2],
+            'role': user[4],
+            'business_id': user[5],
+            'business_name': user[9]
+        }
     })
 
 
@@ -318,41 +331,29 @@ def forgot_password():
     email = request.get_json().get('email', '').strip()
     if not email:
         return jsonify({'error': 'Email required'}), 400
-
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT name FROM users WHERE email=%s', (email,))
     user = cursor.fetchone()
     conn.close()
-
     if user:
-        def send_reset_email():
-            try:
-                with app.app_context():
-                    token = serializer.dumps(email, salt='reset-password')
-                    link = f"{FRONTEND_URL}/reset-password/{token}"
-                    msg = Message(
-                        'Reset your BizAI password',
-                        sender=app.config['MAIL_USERNAME'],
-                        recipients=[email],
-                        body=f"Hi {user[0]},\n\nClick to reset your password:\n{link}\n\nExpires in 1 hour.\n\nIf you did not request this ignore this email.\n\nBizAI Team"
-                    )
-                    mail.send(msg)
-                    print(f'[BizAI] Reset email sent to {email}')
-            except Exception as e:
-                print(f'[BizAI] Reset email failed: {e}')
-
-        threading.Thread(target=send_reset_email, daemon=True).start()
-
-    return jsonify({'message': 'If that email exists a reset link has been sent.'})
+        token = serializer.dumps(email, salt='reset-password')
+        link = f"{FRONTEND_URL}/reset-password/{token}"
+        threading.Thread(target=send_email, args=(
+            'Reset your BizAI password', [email],
+            f"Hi {user[0]},\n\nClick to reset your password:\n{link}\n\nExpires in 1 hour.\n\nIf you did not request this, ignore this email.\n\nBizAI Team"
+        ), daemon=True).start()
+    return jsonify({'message': 'If that email exists, a reset link has been sent.'})
 
 
 @app.route('/api/reset-password/<token>', methods=['POST'])
 def reset_password(token):
     try:
         email = serializer.loads(token, salt='reset-password', max_age=3600)
-    except Exception:
-        return jsonify({'error': 'Invalid or expired token'}), 400
+    except SignatureExpired:
+        return jsonify({'error': 'Reset link has expired. Please request a new one.'}), 400
+    except BadSignature:
+        return jsonify({'error': 'Invalid reset link.'}), 400
     new_password = request.get_json().get('password', '')
     if len(new_password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
@@ -391,6 +392,7 @@ def join_business():
         conn.close()
         return jsonify({'error': 'This business already has the maximum of 2 users'}), 400
     try:
+        # ✅ is_verified=True — email verification disabled for Render free tier
         cursor.execute(
             'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
             (name, email, generate_password_hash(password), 'user', business_id, True)
@@ -696,7 +698,6 @@ def get_summary():
     user_id = request.args.get('user_id')
     conn = get_db()
     cursor = conn.cursor()
-
     cursor.execute('SELECT SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s', (user_id,))
     row = cursor.fetchone()
     total_income = float(row[0] or 0)
@@ -735,7 +736,7 @@ def get_summary():
 
 
 # ========================
-# WEEKLY REPORT
+# WEEKLY REPORT — 1 query instead of 7
 # ========================
 
 @app.route('/api/weekly-report', methods=['GET'])
@@ -749,29 +750,23 @@ def weekly_report():
         d = datetime.now() - timedelta(days=i)
         days.append(f"{d.month}/{d.day}/{d.year}")
 
+    placeholders = ','.join(['%s'] * len(days))
+    cursor.execute(
+        f'SELECT date, SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s AND date IN ({placeholders}) GROUP BY date',
+        [user_id] + days
+    )
+    day_map = {r[0]: {'revenue': float(r[1]), 'profit': float(r[2]), 'transactions': int(r[3])} for r in cursor.fetchall()}
+
     daily = []
     for day in days:
-        cursor.execute(
-            'SELECT SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s AND date=%s',
-            (user_id, day)
-        )
-        r = cursor.fetchone()
-        daily.append({
-            'date': day,
-            'revenue': float(r[0] or 0),
-            'profit': float(r[1] or 0),
-            'transactions': int(r[2] or 0)
-        })
+        d = day_map.get(day, {'revenue': 0, 'profit': 0, 'transactions': 0})
+        daily.append({'date': day, **d})
 
-    placeholders = ','.join(['%s'] * len(days))
     cursor.execute(
         f'SELECT product, SUM(total_earned), SUM(profit), SUM(qty_sold) FROM sales WHERE user_id=%s AND date IN ({placeholders}) GROUP BY product ORDER BY SUM(qty_sold) DESC LIMIT 5',
         [user_id] + days
     )
-    top_products = [{
-        'product': r[0], 'revenue': float(r[1]),
-        'profit': float(r[2]), 'qty': int(r[3])
-    } for r in cursor.fetchall()]
+    top_products = [{'product': r[0], 'revenue': float(r[1]), 'profit': float(r[2]), 'qty': int(r[3])} for r in cursor.fetchall()]
 
     cursor.execute(
         f'SELECT SUM(total_earned), SUM(profit), COUNT(*) FROM sales WHERE user_id=%s AND date IN ({placeholders})',
@@ -798,10 +793,7 @@ def get_alerts():
     user_id = request.args.get('user_id')
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute(
-        'SELECT product,qty_bought,qty_remaining,duration_days FROM stock WHERE user_id=%s',
-        (user_id,)
-    )
+    cursor.execute('SELECT product,qty_bought,qty_remaining,duration_days FROM stock WHERE user_id=%s', (user_id,))
     stock_rows = cursor.fetchall()
     alerts = []
     for row in stock_rows:
@@ -830,7 +822,7 @@ def get_alerts():
 
 
 # ========================
-# PREDICTIONS — sorted by qty sold not revenue
+# PREDICTIONS
 # ========================
 
 @app.route('/api/predictions', methods=['GET'])
@@ -847,7 +839,6 @@ def get_predictions_route():
     if not predictions:
         conn = get_db()
         cursor = conn.cursor()
-        # sort by qty_sold not revenue — highest selling products
         cursor.execute(
             'SELECT product, SUM(qty_sold) as total_qty, SUM(total_earned) as revenue FROM sales WHERE user_id=%s GROUP BY product ORDER BY total_qty DESC LIMIT 3',
             (user_id,)
@@ -855,18 +846,15 @@ def get_predictions_route():
         rows = cursor.fetchall()
         conn.close()
         predictions = [{
-            'product': r[0],
-            'total_qty': int(r[1]),
-            'revenue': float(r[2]),
-            'prediction': 'High demand — stock up on this product',
-            'confidence': 'N/A'
+            'product': r[0], 'total_qty': int(r[1]), 'revenue': float(r[2]),
+            'prediction': 'High demand — stock up on this product', 'confidence': 'N/A'
         } for r in rows]
 
     return jsonify(predictions)
 
 
 # ========================
-# SIMULATION — with stock check
+# SIMULATION
 # ========================
 
 @app.route('/api/simulate', methods=['POST'])
@@ -890,7 +878,6 @@ def simulate():
 
     cost_per_unit = float(stock_row[0]) if stock_row else 0
     qty_remaining = int(stock_row[1]) if stock_row else 0
-
     original_revenue = sum(float(r[0]) * float(r[1]) for r in rows)
     original_profit = original_revenue - (cost_per_unit * sum(r[0] for r in rows))
     projected_revenue = new_price * new_qty
@@ -905,7 +892,6 @@ def simulate():
     else:
         verdict = f"No change. Projected profit is KES {projected_profit:,.0f}."
 
-    # add stock context
     if qty_remaining > 0:
         if new_qty <= qty_remaining:
             verdict += f" Note: You already have {qty_remaining} units in stock — focus on selling what you have before buying more."

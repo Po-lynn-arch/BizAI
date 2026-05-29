@@ -52,7 +52,7 @@ export function Dashboard() {
         <header style={styles.topbar}>
           <div>
             <h2 style={styles.pageTitle}>Dashboard</h2>
-            <p style={styles.pageSubtitle}>Welcome back, <strong style={{ color: '#fff' }}>{user.businessName}</strong></p>
+            <p style={styles.pageSubtitle}>Welcome back, <strong style={{ color: '#fff' }}>{user.business_name || user.name}</strong></p>
           </div>
           <div style={styles.dateBadge}>
             {new Date().toLocaleDateString('en-KE', { weekday: 'short', day: 'numeric', month: 'short' })}
