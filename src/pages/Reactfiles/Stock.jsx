@@ -12,7 +12,7 @@ export function Stock() {
   const [duration, setDuration] = useState('30')
   const [suggestedPrice, setSuggestedPrice] = useState('')
   const [stockType, setStockType] = useState('new')
-  const [mode, setMode] = useState('single') // single or multi
+  const [mode, setMode] = useState('single')
   const [entries, setEntries] = useState([{ qty_bought: '', cost_per_unit: '', suggested_price: '' }])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -22,20 +22,16 @@ export function Stock() {
     fetch(`${API_URL}/api/stock?user_id=${user.id}`)
       .then(res => res.json())
       .then(data => setStock(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Failed to load stock:', err))
+      .catch(() => {})
   }
 
   useEffect(() => { loadStock() }, [])
 
-  function addEntry() {
-    setEntries([...entries, { qty_bought: '', cost_per_unit: '', suggested_price: '' }])
-  }
-
+  function addEntry() { setEntries([...entries, { qty_bought: '', cost_per_unit: '', suggested_price: '' }]) }
   function removeEntry(idx) {
     if (entries.length === 1) return
     setEntries(entries.filter((_, i) => i !== idx))
   }
-
   function updateEntry(idx, field, value) {
     const updated = [...entries]
     updated[idx][field] = value
@@ -45,12 +41,27 @@ export function Stock() {
   async function addStock() {
     setError(''); setSuccess('')
     if (!product) { setError('Please enter a product name'); return }
-
     setLoading(true)
+
     try {
       if (mode === 'single') {
-        if (!qty) { setError('Please enter quantity'); setLoading(false); return }
-        if (stockType === 'new' && !cost) { setError('Please enter cost per unit'); setLoading(false); return }
+        if (!qty) { setError('Please enter quantity'); return }
+        if (stockType === 'new' && !cost) { setError('Please enter cost per unit'); return }
+
+        // ✅ Optimistic update
+        const tempStock = {
+          id: `temp_${Date.now()}`,
+          product, qty_bought: Number(qty),
+          qty_remaining: Number(qty),
+          cost_per_unit: stockType === 'new' ? Number(cost) : 0,
+          suggested_price: Number(suggestedPrice) || 0,
+          total_cost: stockType === 'new' ? Number(qty) * Number(cost) : 0,
+          duration_days: Number(duration),
+          stock_type: stockType,
+          date_added: new Date().toLocaleDateString()
+        }
+        setStock(prev => [tempStock, ...prev])
+        setProduct(''); setQty(''); setCost(''); setSuggestedPrice(''); setDuration('30')
 
         const res = await fetch(`${API_URL}/api/stock`, {
           method: 'POST',
@@ -68,15 +79,14 @@ export function Stock() {
         const data = await res.json()
         if (res.ok) {
           setSuccess('Stock added successfully!')
-          setProduct(''); setQty(''); setCost(''); setSuggestedPrice(''); setDuration('30')
           loadStock()
         } else {
           setError(data.error)
+          setStock(prev => prev.filter(s => s.id !== tempStock.id))
         }
       } else {
-        // multi — add each entry separately
         const validEntries = entries.filter(e => Number(e.qty_bought) > 0)
-        if (validEntries.length === 0) { setError('Add at least one entry with quantity'); setLoading(false); return }
+        if (validEntries.length === 0) { setError('Add at least one entry with quantity'); return }
 
         for (const e of validEntries) {
           await fetch(`${API_URL}/api/stock`, {
@@ -98,7 +108,7 @@ export function Stock() {
         setProduct('')
         loadStock()
       }
-    } catch (err) {
+    } catch {
       setError('Failed to add stock. Please try again.')
     } finally {
       setLoading(false)
@@ -117,7 +127,6 @@ export function Stock() {
         </header>
 
         <div className="entry-form">
-          {/* Stock Type */}
           <div className="form-row" style={{ marginBottom: '16px' }}>
             <div className="form-field">
               <label>Stock Type</label>
@@ -139,7 +148,6 @@ export function Stock() {
               : '📋 Existing Stock — only quantity tracked. No cost recorded.'}
           </div>
 
-          {/* Product name */}
           <div className="form-row" style={{ marginBottom: '16px' }}>
             <div className="form-field">
               <label>Product Name</label>
@@ -155,7 +163,6 @@ export function Stock() {
             </div>
           </div>
 
-          {/* Mode toggle */}
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             {[['single', '📦 Single Entry'], ['multi', '🗂 Multiple Entries']].map(([m, label]) => (
               <button key={m} onClick={() => setMode(m)} style={{
@@ -189,7 +196,7 @@ export function Stock() {
           ) : (
             <>
               <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: '#93c5fd' }}>
-                💡 Use this when you bought the same product in batches at different costs. Each row is one batch.
+                💡 Use this when you bought the same product in batches at different costs.
               </div>
               {entries.map((entry, idx) => (
                 <div key={idx} className="form-row" style={{ alignItems: 'flex-end', marginBottom: '10px' }}>
@@ -228,12 +235,11 @@ export function Stock() {
           {error && <p style={{ color: 'red', fontSize: '14px', marginTop: '8px' }}>{error}</p>}
           {success && <p style={{ color: '#10B981', fontSize: '14px', marginTop: '8px' }}>✅ {success}</p>}
 
-          <button className="add-btn" style={{ background: '#FFA500', color: '#000' }} onClick={addStock} disabled={loading}>
+          <button className="add-btn" style={{ background: loading ? '#555' : '#FFA500', color: '#000' }} onClick={addStock} disabled={loading}>
             {loading ? 'Adding...' : '+ Add Stock'}
           </button>
         </div>
 
-        {/* Stock Table */}
         <div className="recent-sales">
           <h3>Current Stock ({stock.length} products)</h3>
           {stock.length === 0 ? <p className="empty-state">No stock added yet.</p> : (
@@ -246,7 +252,7 @@ export function Stock() {
                   const percent = Math.round((s.qty_remaining / s.qty_bought) * 100)
                   const color = percent <= 10 ? '#ff4444' : percent <= 30 ? '#FFA500' : '#10B981'
                   return (
-                    <tr key={s.id}>
+                    <tr key={s.id} style={{ opacity: String(s.id).startsWith('temp_') ? 0.6 : 1 }}>
                       <td>{s.product}</td>
                       <td>
                         <span style={{

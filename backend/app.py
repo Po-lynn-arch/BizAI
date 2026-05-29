@@ -38,7 +38,7 @@ LOCK_MINUTES = 10
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 # ========================
-# CONNECTION POOL — fixes slowness
+# CONNECTION POOL
 # ========================
 db_pool = None
 
@@ -101,7 +101,7 @@ def init_db():
             host=os.environ.get('DB_HOST', 'localhost'),
             user=os.environ.get('DB_USER', 'root'),
             password=os.environ.get('DB_PASSWORD', ''),
-            database=os.environ.get('DB_NAME', 'default_db'),  # ← FIXED: was 'bizai'
+            database=os.environ.get('DB_NAME', 'default_db'),
             port=int(os.environ.get('DB_PORT', 3306)),
             ssl_disabled=False
         )
@@ -277,8 +277,14 @@ def login():
 
     conn = get_db()
     cursor = conn.cursor()
+
+    # ✅ UPDATED — joins businesses table to get business_name
     cursor.execute(
-        'SELECT id,name,email,password,role,business_id,is_verified,failed_attempts,locked_until FROM users WHERE email=%s',
+        '''SELECT u.id, u.name, u.email, u.password, u.role, u.business_id,
+                  u.is_verified, u.failed_attempts, u.locked_until, b.name as business_name
+           FROM users u
+           LEFT JOIN businesses b ON u.business_id = b.id
+           WHERE u.email=%s''',
         (email,)
     )
     user = cursor.fetchone()
@@ -309,9 +315,18 @@ def login():
     cursor.execute('UPDATE users SET failed_attempts=0, locked_until=NULL WHERE email=%s', (email,))
     conn.commit()
     conn.close()
+
+    # ✅ UPDATED — includes business_name in response
     return jsonify({
         'message': 'Login successful',
-        'user': {'id': user[0], 'name': user[1], 'email': user[2], 'role': user[4], 'business_id': user[5]}
+        'user': {
+            'id': user[0],
+            'name': user[1],
+            'email': user[2],
+            'role': user[4],
+            'business_id': user[5],
+            'business_name': user[9]
+        }
     })
 
 
@@ -722,7 +737,7 @@ def get_summary():
 
 
 # ========================
-# WEEKLY REPORT — optimized to 3 queries instead of 7
+# WEEKLY REPORT
 # ========================
 
 @app.route('/api/weekly-report', methods=['GET'])

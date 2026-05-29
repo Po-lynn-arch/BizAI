@@ -13,6 +13,7 @@ export function SalesEntry() {
   const [price, setPrice] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [saving, setSaving] = useState(false)
   const [entries, setEntries] = useState([{ qty_sold: '', price_per_unit: '' }])
 
   function loadData() {
@@ -22,7 +23,7 @@ export function SalesEntry() {
     ]).then(([salesData, stockData]) => {
       setSales(Array.isArray(salesData) ? salesData : [])
       setStock(Array.isArray(stockData) ? stockData : [])
-    }).catch(err => console.error('Failed to load data:', err))
+    }).catch(() => {})
   }
 
   useEffect(() => { loadData() }, [])
@@ -33,15 +34,11 @@ export function SalesEntry() {
   const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
   const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
 
-  function addEntry() {
-    setEntries([...entries, { qty_sold: '', price_per_unit: '' }])
-  }
-
+  function addEntry() { setEntries([...entries, { qty_sold: '', price_per_unit: '' }]) }
   function removeEntry(idx) {
     if (entries.length === 1) return
     setEntries(entries.filter((_, i) => i !== idx))
   }
-
   function updateEntry(idx, field, value) {
     const updated = [...entries]
     updated[idx][field] = value
@@ -52,31 +49,66 @@ export function SalesEntry() {
     const q = Number(e.qty_sold) || 0
     const p = Number(e.price_per_unit) || 0
     const cost = selectedStock?.cost_per_unit || 0
-    acc.qty += q
-    acc.revenue += q * p
-    acc.profit += (p - cost) * q
+    acc.qty += q; acc.revenue += q * p; acc.profit += (p - cost) * q
     return acc
   }, { qty: 0, revenue: 0, profit: 0 })
 
   async function recordSingleSale() {
     setError(''); setSuccess('')
     if (!product || !qty || !price) { setError('Fill all fields'); return }
-    const res = await fetch(`${API_URL}/api/sales`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: user.id, product,
-        qty_sold: Number(qty), price_per_unit: Number(price),
-        date: today
+
+    const qtyNum = Number(qty)
+    const priceNum = Number(price)
+    const cost = selectedStock?.cost_per_unit || 0
+
+    // ✅ Optimistic update
+    const tempSale = {
+      id: `temp_${Date.now()}`,
+      product, qty_sold: qtyNum,
+      price_per_unit: priceNum,
+      cost_per_unit: cost,
+      total_earned: qtyNum * priceNum,
+      profit: (priceNum - cost) * qtyNum,
+      date: today
+    }
+    setSales(prev => [tempSale, ...prev])
+    setStock(prev => prev.map(s =>
+      s.product === product
+        ? { ...s, qty_remaining: s.qty_remaining - qtyNum }
+        : s
+    ))
+    setQty(''); setPrice('')
+    setSaving(true)
+
+    try {
+      const res = await fetch(`${API_URL}/api/sales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id, product,
+          qty_sold: qtyNum, price_per_unit: priceNum,
+          date: today
+        })
       })
-    })
-    const data = await res.json()
-    if (res.ok) {
-      setSuccess('Sale recorded!')
-      setQty(''); setPrice('')
-      loadData()
-    } else {
-      setError(data.error)
+      const data = await res.json()
+      if (res.ok) {
+        setSuccess('Sale recorded!')
+        loadData() // refresh to get real ids
+      } else {
+        setError(data.error)
+        // Revert on error
+        setSales(prev => prev.filter(s => s.id !== tempSale.id))
+        setStock(prev => prev.map(s =>
+          s.product === product
+            ? { ...s, qty_remaining: s.qty_remaining + qtyNum }
+            : s
+        ))
+      }
+    } catch {
+      setError('Failed to record sale. Please try again.')
+      setSales(prev => prev.filter(s => s.id !== tempSale.id))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -85,28 +117,80 @@ export function SalesEntry() {
     if (!product) { setError('Select a product'); return }
     const validEntries = entries.filter(e => Number(e.qty_sold) > 0 && Number(e.price_per_unit) > 0)
     if (validEntries.length === 0) { setError('Add at least one entry with qty and price'); return }
-    const res = await fetch(`${API_URL}/api/sales`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: user.id, product,
-        entries: validEntries.map(e => ({ qty_sold: Number(e.qty_sold), price_per_unit: Number(e.price_per_unit) })),
-        date: today
+
+    const cost = selectedStock?.cost_per_unit || 0
+    const totalQty = validEntries.reduce((sum, e) => sum + Number(e.qty_sold), 0)
+
+    // ✅ Optimistic update
+    const tempSales = validEntries.map(e => ({
+      id: `temp_${Date.now()}_${Math.random()}`,
+      product,
+      qty_sold: Number(e.qty_sold),
+      price_per_unit: Number(e.price_per_unit),
+      cost_per_unit: cost,
+      total_earned: Number(e.qty_sold) * Number(e.price_per_unit),
+      profit: (Number(e.price_per_unit) - cost) * Number(e.qty_sold),
+      date: today
+    }))
+    setSales(prev => [...tempSales, ...prev])
+    setStock(prev => prev.map(s =>
+      s.product === product
+        ? { ...s, qty_remaining: s.qty_remaining - totalQty }
+        : s
+    ))
+    setEntries([{ qty_sold: '', price_per_unit: '' }])
+    setSaving(true)
+
+    try {
+      const res = await fetch(`${API_URL}/api/sales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id, product,
+          entries: validEntries.map(e => ({
+            qty_sold: Number(e.qty_sold),
+            price_per_unit: Number(e.price_per_unit)
+          })),
+          date: today
+        })
       })
-    })
-    const data = await res.json()
-    if (res.ok) {
-      setSuccess(`${validEntries.length} sale entries recorded!`)
-      setEntries([{ qty_sold: '', price_per_unit: '' }])
-      loadData()
-    } else {
-      setError(data.error)
+      const data = await res.json()
+      if (res.ok) {
+        setSuccess(`${validEntries.length} sale entries recorded!`)
+        loadData()
+      } else {
+        setError(data.error)
+        setSales(prev => prev.filter(s => !String(s.id).startsWith('temp_')))
+        loadData()
+      }
+    } catch {
+      setError('Failed to record sales. Please try again.')
+      setSales(prev => prev.filter(s => !String(s.id).startsWith('temp_')))
+    } finally {
+      setSaving(false)
     }
   }
 
   async function deleteSale(id) {
-    await fetch(`${API_URL}/api/sales/${id}`, { method: 'DELETE' })
-    loadData()
+    // ✅ Optimistic update — remove instantly
+    const deleted = sales.find(s => s.id === id)
+    setSales(prev => prev.filter(s => s.id !== id))
+
+    // Restore stock qty optimistically
+    if (deleted) {
+      setStock(prev => prev.map(s =>
+        s.product === deleted.product
+          ? { ...s, qty_remaining: s.qty_remaining + deleted.qty_sold }
+          : s
+      ))
+    }
+
+    try {
+      await fetch(`${API_URL}/api/sales/${id}`, { method: 'DELETE' })
+    } catch {
+      // Revert if failed
+      loadData()
+    }
   }
 
   return (
@@ -171,14 +255,15 @@ export function SalesEntry() {
                   <p style={{ color: '#aaa' }}>Remaining after sale: {selectedStock.qty_remaining - Number(qty)} units</p>
                 </div>
               )}
-              <button className="add-btn" onClick={recordSingleSale}>+ Record Sale</button>
+              <button className="add-btn" onClick={recordSingleSale} disabled={saving}>
+                {saving ? 'Saving...' : '+ Record Sale'}
+              </button>
             </>
           ) : (
             <>
               <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px', color: '#93c5fd' }}>
-                💡 Use this when you sold the same product at different prices. E.g. trousers sold at KES 800, KES 900, and KES 1000 — add one row per price.
+                💡 Use this when you sold the same product at different prices.
               </div>
-
               {entries.map((entry, idx) => (
                 <div key={idx} className="form-row" style={{ alignItems: 'flex-end', marginBottom: '10px' }}>
                   <div className="form-field">
@@ -199,19 +284,18 @@ export function SalesEntry() {
                   <button onClick={() => removeEntry(idx)} style={{ background: '#2b0d0d', border: '1px solid #ff4444', color: '#ff4444', borderRadius: '6px', padding: '8px 12px', cursor: 'pointer', marginBottom: '4px' }}>✕</button>
                 </div>
               ))}
-
               <button onClick={addEntry} style={{ background: 'transparent', border: '1px dashed #3b82f6', color: '#3b82f6', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', marginBottom: '16px', fontSize: '13px' }}>
                 + Add Another Price
               </button>
-
               {multiTotals.qty > 0 && (
                 <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '8px', padding: '10px 14px', marginBottom: '12px', fontSize: '13px' }}>
                   <p style={{ color: '#10B981' }}>Total qty: {multiTotals.qty} units &nbsp;|&nbsp; Total revenue: KES {multiTotals.revenue.toLocaleString()}</p>
                   <p style={{ color: '#fff' }}>Total profit: KES {multiTotals.profit.toLocaleString()}</p>
                 </div>
               )}
-
-              <button className="add-btn" onClick={recordMultiSale}>+ Record All Sales</button>
+              <button className="add-btn" onClick={recordMultiSale} disabled={saving}>
+                {saving ? 'Saving...' : '+ Record All Sales'}
+              </button>
             </>
           )}
 
@@ -239,7 +323,7 @@ export function SalesEntry() {
               </thead>
               <tbody>
                 {sales.map(s => (
-                  <tr key={s.id}>
+                  <tr key={s.id} style={{ opacity: String(s.id).startsWith('temp_') ? 0.6 : 1 }}>
                     <td>{s.product}</td>
                     <td>{s.qty_sold}</td>
                     <td>KES {s.price_per_unit?.toLocaleString()}</td>
@@ -247,7 +331,11 @@ export function SalesEntry() {
                     <td>KES {s.total_earned?.toLocaleString()}</td>
                     <td style={{ color: s.profit >= 0 ? '#10B981' : 'red', fontWeight: 'bold' }}>KES {s.profit?.toLocaleString()}</td>
                     <td>{s.date}</td>
-                    <td><button className="delete-btn" onClick={() => deleteSale(s.id)}>🗑</button></td>
+                    <td>
+                      {!String(s.id).startsWith('temp_') && (
+                        <button className="delete-btn" onClick={() => deleteSale(s.id)}>🗑</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
