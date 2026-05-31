@@ -79,6 +79,13 @@ export function OperationalExpenses() {
     return sum + d.amount // monthly
   }, 0)
 
+  const getDailyAmount = (amount, frequency) => {
+    if (frequency === 'daily') return amount
+    if (frequency === 'weekly') return amount / 7
+    if (frequency === 'monthly') return amount / 30
+    if (frequency === 'once') return 0 // one time cost has no daily impact
+    return amount / 30
+  }
 
   const fixedExpenses = data.filter(d => d.is_fixed)
   const variableExpenses = data.filter(d => !d.is_fixed)
