@@ -13,8 +13,8 @@ import { SalesEntry } from './pages/Reactfiles/SalesEntry'
 import { OperationalExpenses } from './pages/Reactfiles/OperationalExpenses'
 import { ProtectedRoute } from './pages/Reactfiles/ProtectedRoute'
 import { VerifyEmail } from './pages/Reactfiles/VerifyEmail'
-import { ForgotPassword } from './pages/Reactfiles/ForgotPassword'
-import { ResetPassword } from './pages/Reactfiles/ResetPassword'
+// import { ForgotPassword } from './pages/Reactfiles/ForgotPassword'
+// import { ResetPassword } from './pages/Reactfiles/ResetPassword'
 import { API_URL } from './hooks/config'
 
 export function App() {
@@ -114,8 +114,8 @@ export function App() {
       <Route path="/Sales" element={<ProtectedRoute><SalesEntry /></ProtectedRoute>} />
       <Route path="/Expenses" element={<ProtectedRoute><OperationalExpenses /></ProtectedRoute>} />
       <Route path="/VerifyEmail" element={<VerifyEmail />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password/:token" element={<ResetPassword />} />
+      {/*<Route path="/forgot-password" element={<ForgotPassword />} /> */}
+      {/*<Route path="/reset-password/:token" element={<ResetPassword />} />*/}
     </Routes>
   )
 }
