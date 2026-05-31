@@ -2,6 +2,7 @@ import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function SalesEntry() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -327,6 +328,7 @@ export function SalesEntry() {
           )}
         </div>
       </div>
+      <BottomNavBar/>
     </div>
   )
 }

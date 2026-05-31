@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 
+import { BottomNavBar } from '../../components/BottomNavBar'
+
 export function AdminPage() {
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -15,6 +17,8 @@ export function AdminPage() {
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const [businessCode, setBusinessCode] = useState('')
+  
+
 
   function loadUsers() {
     Promise.all([
@@ -167,6 +171,8 @@ export function AdminPage() {
           )}
         </div>
       </div>
-    </div>
+      <BottomNavBar/>
+     </div>
+      
   )
 }

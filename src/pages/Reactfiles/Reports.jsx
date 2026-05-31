@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
 import { useBusinessData } from '../../hooks/useBusinessData'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function Reports() {
   const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
@@ -220,6 +221,7 @@ export function Reports() {
           </>
         )}
       </div>
+      <BottomNavBar/>
     </div>
   )
 }

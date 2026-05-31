@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
 import { useBusinessData } from '../../hooks/useBusinessData'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function Predictions() {
   const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
@@ -121,6 +122,7 @@ export function Predictions() {
           </>
         )}
       </div>
+      <BottomNavBar/>
     </div>
   )
 }

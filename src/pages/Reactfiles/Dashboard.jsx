@@ -4,6 +4,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { Sidebar } from '../../components/Sidebar'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 import { API_URL } from '../../hooks/config'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function Dashboard() {
   const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
@@ -13,6 +14,7 @@ export function Dashboard() {
   const [reminders, setReminders] = useState([])
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
+  
 
   useEffect(() => {
     if (!user.id) return
@@ -194,6 +196,7 @@ export function Dashboard() {
         )}
 
       </div>
+      <BottomNavBar/>
     </div>
   )
 }

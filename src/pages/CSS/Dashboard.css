@@ -407,3 +407,50 @@ body.sidebar-collapsed .main-content-area {
   .mobile-expense-list { display: block; }
   .desktop-expense-table { display: none; }
 }
+
+@media (max-width: 768px) {
+  .sidebar {
+    display: none !important;
+  }
+
+  .mobile-nav {
+    display: flex !important;
+  }
+
+  .main-content-area {
+    margin-left: 0 !important;
+    padding-bottom: 80px;
+  }
+}
+
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #111;
+  border-top: 1px solid #2a2a2a;
+  z-index: 1000;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.mobile-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: #aaa;
+  font-size: 10px;
+  gap: 2px;
+}
+
+.mobile-nav a.active {
+  color: #10B981;
+}
+
+.mobile-nav a span.icon {
+  font-size: 20px;
+}

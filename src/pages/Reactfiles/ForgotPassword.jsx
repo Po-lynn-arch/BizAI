@@ -4,24 +4,23 @@ import { useNavigate } from 'react-router-dom'
 import { API_URL } from '../../hooks/config'
 
 export function ForgotPassword() {
-  const [mode, setMode] = useState('phone') // 'email' or 'phone'
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [show, setShow] = useState(false)
-  const [step, setStep] = useState(1) // 1=enter phone, 2=enter code+password
-  const [message, setMessage] = useState('')
+  const [step, setStep] = useState(1)
+  const [token, setToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [done, setDone] = useState(false)
   const navigate = useNavigate()
 
-  // ── EMAIL RESET ──────────────────────────────────────────────
-  async function handleEmailSubmit() {
+  // Step 1 — get the security question for this email
+  async function handleGetQuestion() {
     setError('')
-    setMessage('')
-    if (!email) { setError('Please enter your email address'); return }
+    if (!email) { setError('Please enter your email'); return }
     setLoading(true)
     try {
       const res = await fetch(`${API_URL}/api/forgot-password`, {
@@ -31,9 +30,10 @@ export function ForgotPassword() {
       })
       const data = await res.json()
       if (res.ok) {
-        setMessage(data.message)
+        setQuestion(data.question)
+        setStep(2)
       } else {
-        setError(data.error || 'Something went wrong')
+        setError(data.error || 'Email not found')
       }
     } catch {
       setError('Network error. Please try again.')
@@ -42,23 +42,23 @@ export function ForgotPassword() {
     }
   }
 
-  // ── PHONE STEP 1 — send code ─────────────────────────────────
-  async function handleSendCode() {
+  // Step 2 — verify answer and get reset token
+  async function handleVerifyAnswer() {
     setError('')
-    if (!phone) { setError('Please enter your phone number'); return }
+    if (!answer) { setError('Please enter your answer'); return }
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/api/forgot-password-sms`, {
+      const res = await fetch(`${API_URL}/api/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone })
+        body: JSON.stringify({ email, answer })
       })
       const data = await res.json()
       if (res.ok) {
-        setStep(2)
-        setMessage(data.message)
+        setToken(data.token)
+        setStep(3)
       } else {
-        setError(data.error || 'Failed to send code')
+        setError(data.error || 'Incorrect answer')
       }
     } catch {
       setError('Network error. Please try again.')
@@ -67,27 +67,25 @@ export function ForgotPassword() {
     }
   }
 
-  // ── PHONE STEP 2 — verify code and reset password ────────────
-  async function handleVerifyAndReset() {
+  // Step 3 — reset password using token
+  async function handleReset() {
     setError('')
-    if (!code) { setError('Please enter the code sent to your phone'); return }
-    if (!newPassword) { setError('Please enter a new password'); return }
+    if (!newPassword) { setError('Enter a new password'); return }
     if (newPassword.length < 6) { setError('Password must be at least 6 characters'); return }
     if (newPassword !== confirmPassword) { setError('Passwords do not match'); return }
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/api/verify-reset-code`, {
+      const res = await fetch(`${API_URL}/api/reset-password/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code, password: newPassword })
+        body: JSON.stringify({ password: newPassword })
       })
       const data = await res.json()
       if (res.ok) {
-        setMessage(data.message)
-        setStep(3)
+        setDone(true)
         setTimeout(() => navigate('/login'), 3000)
       } else {
-        setError(data.error || 'Verification failed')
+        setError(data.error || 'Reset failed')
       }
     } catch {
       setError('Network error. Please try again.')
@@ -95,6 +93,19 @@ export function ForgotPassword() {
       setLoading(false)
     }
   }
+
+  if (done) return (
+    <div className="auth-page">
+      <div className="auth-card" style={{ textAlign: 'center' }}>
+        <span className="logo">BizAI</span>
+        <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '12px', padding: '24px', marginTop: '20px' }}>
+          <p style={{ fontSize: '40px' }}>✅</p>
+          <p style={{ color: '#10B981', fontSize: '15px', fontWeight: '600' }}>Password reset successfully!</p>
+          <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>Redirecting to login...</p>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="auth-page">
@@ -102,167 +113,92 @@ export function ForgotPassword() {
         <div className="auth-header">
           <span className="logo">BizAI</span>
           <h2>Reset Password</h2>
-          <p>Choose how you want to reset your password</p>
+          <p>
+            {step === 1 && 'Enter your email to find your account'}
+            {step === 2 && 'Answer your security question'}
+            {step === 3 && 'Choose a new password'}
+          </p>
         </div>
 
-        {/* SUCCESS STATE */}
-        {step === 3 ? (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '12px', padding: '24px', marginBottom: '20px' }}>
-              <p style={{ fontSize: '40px', marginBottom: '8px' }}>✅</p>
-              <p style={{ color: '#10B981', fontSize: '15px', fontWeight: '600' }}>Password reset successfully!</p>
-              <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>Redirecting to login in 3 seconds...</p>
-            </div>
-          </div>
-        ) : message && mode === 'email' ? (
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '12px', padding: '24px', marginBottom: '20px' }}>
-              <p style={{ fontSize: '40px', marginBottom: '8px' }}>📬</p>
-              <p style={{ color: '#10B981', fontSize: '14px', lineHeight: '1.6' }}>{message}</p>
-            </div>
-            <button className="auth-btn" onClick={() => navigate('/login')}>Back to Login</button>
-          </div>
-        ) : (
+        {/* STEP INDICATOR */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          {[1, 2, 3].map(s => (
+            <div key={s} style={{
+              flex: 1, height: '4px', borderRadius: '2px',
+              background: s <= step ? '#10B981' : '#2a2a2a',
+              transition: 'background 0.3s'
+            }} />
+          ))}
+        </div>
+
+        {/* STEP 1 — EMAIL */}
+        {step === 1 && (
           <>
-            {/* MODE TOGGLE */}
-            <div style={{ display: 'flex', background: '#1a1a1a', borderRadius: '10px', padding: '4px', marginBottom: '24px', gap: '4px' }}>
-              <button
-                onClick={() => { setMode('phone'); setStep(1); setError(''); setMessage('') }}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: '8px', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: '600', border: 'none',
-                  background: mode === 'phone' ? '#10B981' : 'transparent',
-                  color: mode === 'phone' ? '#fff' : '#aaa',
-                  transition: 'all 0.2s'
-                }}>
-                📱 Via Phone SMS
-              </button>
-              <button
-                onClick={() => { setMode('email'); setStep(1); setError(''); setMessage('') }}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: '8px', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: '600', border: 'none',
-                  background: mode === 'email' ? '#10B981' : 'transparent',
-                  color: mode === 'email' ? '#fff' : '#aaa',
-                  transition: 'all 0.2s'
-                }}>
-                📧 Via Email
-              </button>
+            <div className="auth-field">
+              <label>Email Address</label>
+              <input type="email" placeholder="your@email.com" value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleGetQuestion()} />
             </div>
-
-            {/* EMAIL MODE */}
-            {mode === 'email' && (
-              <>
-                <div className="auth-field">
-                  <label>Email address</label>
-                  <input
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleEmailSubmit()}
-                  />
-                </div>
-                {error && <p style={{ color: '#ff4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
-                <button className="auth-btn" onClick={handleEmailSubmit} disabled={loading}>
-                  {loading ? 'Sending...' : 'Send Reset Link'}
-                </button>
-              </>
-            )}
-
-            {/* PHONE MODE — STEP 1 */}
-            {mode === 'phone' && step === 1 && (
-              <>
-                <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '12px', marginBottom: '16px', color: '#93c5fd', fontSize: '13px' }}>
-                  💡 Enter the phone number you registered with. We'll send a 6-digit code via SMS.
-                </div>
-                <div className="auth-field">
-                  <label>Phone Number</label>
-                  <input
-                    type="tel"
-                    placeholder="e.g. 0712345678"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSendCode()}
-                  />
-                  <p style={{ color: '#666', fontSize: '11px', marginTop: '4px' }}>Enter your number starting with 07... or +254...</p>
-                </div>
-                {error && <p style={{ color: '#ff4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
-                <button className="auth-btn" onClick={handleSendCode} disabled={loading}>
-                  {loading ? 'Sending Code...' : 'Send Code via SMS'}
-                </button>
-              </>
-            )}
-
-            {/* PHONE MODE */}
-            {mode === 'phone' && step === 2 && (
-              <>
-                <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '8px', padding: '12px', marginBottom: '16px', color: '#10B981', fontSize: '13px' }}>
-                  ✅ Code sent to {phone}. Enter it below along with your new password.
-                </div>
-
-                <div className="auth-field">
-                  <label>6-Digit Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 123456"
-                    value={code}
-                    onChange={e => setCode(e.target.value)}
-                    maxLength={6}
-                    style={{ letterSpacing: '8px', fontSize: '20px', textAlign: 'center' }}
-                  />
-                </div>
-
-                <div className="auth-field">
-                  <label>New Password</label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type={show ? 'text' : 'password'}
-                      placeholder="At least 6 characters"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      style={{ width: '100%', paddingRight: '60px', boxSizing: 'border-box' }}
-                    />
-                    <span
-                      onClick={() => setShow(!show)}
-                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '12px', color: '#10B981', fontWeight: '600' }}>
-                      {show ? 'Hide' : 'Show'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="auth-field">
-                  <label>Confirm New Password</label>
-                  <input
-                    type={show ? 'text' : 'password'}
-                    placeholder="Repeat new password"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleVerifyAndReset()}
-                  />
-                </div>
-
-                {error && <p style={{ color: '#ff4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
-
-                <button className="auth-btn" onClick={handleVerifyAndReset} disabled={loading}>
-                  {loading ? 'Verifying...' : 'Reset Password'}
-                </button>
-
-                <p
-                  style={{ cursor: 'pointer', color: '#aaa', marginTop: '12px', fontSize: '13px', textAlign: 'center' }}
-                  onClick={() => { setStep(1); setCode(''); setError('') }}>
-                  ← Resend code
-                </p>
-              </>
-            )}
-
-            <p
-              style={{ cursor: 'pointer', color: '#4f46e5', marginTop: '16px', fontSize: '13px', textAlign: 'center' }}
-              onClick={() => navigate('/login')}>
-              ← Back to login
-            </p>
+            {error && <p style={{ color: '#ff4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
+            <button className="auth-btn" onClick={handleGetQuestion} disabled={loading}>
+              {loading ? 'Looking up...' : 'Continue'}
+            </button>
           </>
         )}
+
+        {/* STEP 2 — SECURITY QUESTION */}
+        {step === 2 && (
+          <>
+            <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '14px', marginBottom: '16px' }}>
+              <p style={{ color: '#aaa', fontSize: '12px', marginBottom: '4px' }}>Security Question:</p>
+              <p style={{ color: '#93c5fd', fontSize: '14px', fontWeight: '600' }}>{question}</p>
+            </div>
+            <div className="auth-field">
+              <label>Your Answer</label>
+              <input type="text" placeholder="Type your answer" value={answer}
+                onChange={e => setAnswer(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleVerifyAnswer()} />
+              <p style={{ color: '#666', fontSize: '11px', marginTop: '4px' }}>Answers are not case-sensitive</p>
+            </div>
+            {error && <p style={{ color: '#ff4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
+            <button className="auth-btn" onClick={handleVerifyAnswer} disabled={loading}>
+              {loading ? 'Verifying...' : 'Verify Answer'}
+            </button>
+            <p style={{ cursor: 'pointer', color: '#aaa', marginTop: '12px', fontSize: '13px', textAlign: 'center' }}
+              onClick={() => { setStep(1); setError('') }}>← Back</p>
+          </>
+        )}
+
+        {/* STEP 3 — NEW PASSWORD */}
+        {step === 3 && (
+          <>
+            <div className="auth-field">
+              <label>New Password</label>
+              <div style={{ position: 'relative' }}>
+                <input type={show ? 'text' : 'password'} placeholder="At least 6 characters"
+                  value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                  style={{ width: '100%', paddingRight: '60px', boxSizing: 'border-box' }} />
+                <span onClick={() => setShow(!show)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '12px', color: '#10B981', fontWeight: '600' }}>
+                  {show ? 'Hide' : 'Show'}
+                </span>
+              </div>
+            </div>
+            <div className="auth-field">
+              <label>Confirm New Password</label>
+              <input type={show ? 'text' : 'password'} placeholder="Repeat new password"
+                value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleReset()} />
+            </div>
+            {error && <p style={{ color: '#ff4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
+            <button className="auth-btn" onClick={handleReset} disabled={loading}>
+              {loading ? 'Resetting...' : 'Reset Password'}
+            </button>
+          </>
+        )}
+
+        <p style={{ cursor: 'pointer', color: '#4f46e5', marginTop: '16px', fontSize: '13px', textAlign: 'center' }}
+          onClick={() => navigate('/login')}>← Back to login</p>
       </div>
     </div>
   )

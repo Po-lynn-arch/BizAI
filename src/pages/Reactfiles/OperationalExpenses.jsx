@@ -2,6 +2,7 @@ import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function OperationalExpenses() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -12,6 +13,7 @@ export function OperationalExpenses() {
   const [isFixed, setIsFixed] = useState(true)
   const [todayProfit, setTodayProfit] = useState(0)
   const [saving, setSaving] = useState(false)
+  
 
   function loadData() {
     Promise.all([
@@ -339,6 +341,7 @@ export function OperationalExpenses() {
           </div>
         )}
       </div>
+      <BottomNavBar/>
     </div>
   )
 }

@@ -179,7 +179,8 @@ def init_db():
             ('sales', 'cost_per_unit', 'DECIMAL(10,2) DEFAULT 0'),
             ('sales', 'profit', 'DECIMAL(10,2) DEFAULT 0'),
             ('stock', 'stock_type', "VARCHAR(20) DEFAULT 'new'"),
-            ('users', 'phone', 'VARCHAR(20) NULL'),
+            ('users', 'security_question', 'VARCHAR(255) DEFAULT NULL'),
+            ('users', 'security_answer', 'VARCHAR(255) DEFAULT NULL'),
         ]
         for table, column, definition in migrations:
             try:
@@ -210,6 +211,9 @@ def register():
     email = data.get('email', '').strip()
     password = data.get('password', '')
     business_name = data.get('business_name', '').strip()
+    security_question = data.get('security_question', '').strip()
+    security_answer = data.get('security_answer', '').strip().lower()
+
 
     if not all([name, email, password, business_name]):
         return jsonify({'error': 'All fields required'}), 400
@@ -222,10 +226,11 @@ def register():
         code = generate_code()
         cursor.execute('INSERT INTO businesses (name, code) VALUES (%s,%s)', (business_name, code))
         business_id = cursor.lastrowid
-        phone = data.get('phone', '').strip()
+        
         cursor.execute(
-            'INSERT INTO users (name,email,password,role,business_id,is_verified,phone) VALUES (%s,%s,%s,%s,%s,%s,%s)',
-            (name, email, generate_password_hash(password), 'admin', business_id, True, phone)
+            'INSERT INTO users (name,email,password,role,business_id,is_verified,security_question,security_answer) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)',
+            (name, email, generate_password_hash(password), 'admin', business_id, True,
+            security_question or None, security_answer or None)
         )
         conn.commit()
 
@@ -339,44 +344,41 @@ def login():
         }
     })
 
-
-@app.route('/api/forgot-password-sms', methods=['POST'])
-def forgot_password_sms():
+@app.route('/api/forgot-password', methods=['POST'])
+def forgot_password():
     data = request.get_json()
-    phone = data.get('phone', '').strip()
-    if not phone:
-        return jsonify({'error': 'Phone number required'}), 400
+    email = data.get('email', '').strip()
+    answer = data.get('answer', '').strip().lower()
+
+    if not email:
+        return jsonify({'error': 'Email required'}), 400
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT id, name FROM users WHERE phone=%s', (phone,))
+    cursor.execute(
+        'SELECT id, name, security_question, security_answer FROM users WHERE email=%s',
+        (email,)
+    )
     user = cursor.fetchone()
     conn.close()
 
-    if not user:
-        return jsonify({'message': 'If that number exists a code has been sent'}), 200
+    # Step 1 — just email, return the question
+    if not answer:
+        if not user or not user[2]:
+            return jsonify({'error': 'No account found or no security question set'}), 404
+        return jsonify({'question': user[2]})
 
-    # generate 6 digit code
-    code = ''.join(random.choices('0123456789', k=6))
-    reset_codes[phone] = {
-        'code': code,
-        'expires': datetime.now() + timedelta(minutes=10),
-        'user_id': user[0]
-    }
+    # Step 2 — email + answer, verify and return token
+    if not user or not user[3]:
+        return jsonify({'error': 'Invalid credentials'}), 401
+    if answer != user[3]:
+        return jsonify({'error': 'Incorrect answer. Please try again.'}), 401
 
-    def send_sms():
-        try:
-            sms.send(
-                f"Your BizAI password reset code is: {code}. Expires in 10 minutes.",
-                [phone]
-            )
-            print(f'[BizAI] SMS sent to {phone}')
-        except Exception as e:
-            print(f'[BizAI] SMS failed: {e}')
-
-    threading.Thread(target=send_sms, daemon=True).start()
-    return jsonify({'message': 'Code sent to your phone'})
-
+    token = serializer.dumps(email, salt='reset-password')
+    return jsonify({
+        'message': 'Answer correct!',
+        'token': token
+    })
 
 @app.route('/api/verify-reset-code', methods=['POST'])
 def verify_reset_code():
@@ -581,6 +583,21 @@ def get_stock():
         'qty_remaining': r[7], 'suggested_price': float(r[8] or 0),
         'date_added': r[9], 'stock_type': r[10]
     } for r in rows])
+
+@app.route('/api/stock/<int:id>', methods=['PATCH'])
+def update_stock(id):
+    data = request.get_json()
+    product = data.get('product', '').strip()
+    if not product:
+        return jsonify({'error': 'Product name required'}), 400
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE stock SET product=%s WHERE id=%s', (product, id))
+    # also update sales to match
+    cursor.execute('UPDATE sales SET product=%s WHERE product=(SELECT product FROM stock WHERE id=%s LIMIT 1)', (product, id))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Product updated'})
 
 
 # ========================

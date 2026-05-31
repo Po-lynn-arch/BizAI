@@ -30,7 +30,9 @@ export function Register() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
-  const [phone, setPhone] = useState('')
+  const [securityQuestion, setSecurityQuestion] = useState('')
+  const [securityAnswer, setSecurityAnswer] = useState('')
+
 
   async function handleRegister() {
     setError('')
@@ -51,8 +53,13 @@ export function Register() {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          name, email, password, business_name: businessName,
+          security_question: securityQuestion,
+          security_answer: securityAnswer
+        })
       })
+
       const data = await response.json()
       if (response.ok) {
         if (mode === 'new') {
@@ -125,16 +132,20 @@ export function Register() {
             </div>
            
             <div className="auth-field">
-              <label>Phone Number</label>
-              <input
-                placeholder="e.g. 0712345678"
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-              />
-              <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                Used for password reset via SMS
-              </p>
+              <label>Security Question</label>
+              <select value={securityQuestion} onChange={e => setSecurityQuestion(e.target.value)}>
+                <option value="">-- Choose a security question --</option>
+                <option value="What is the name of your first pet?">What is the name of your first pet?</option>
+                <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                <option value="What was the name of your primary school?">What was the name of your primary school?</option>
+                <option value="What is the name of the town you grew up in?">What is the name of the town you grew up in?</option>
+                <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+              </select>
+            </div>
+            <div className="auth-field">
+              <label>Security Answer</label>
+              <input type="text" placeholder="Your answer (not case-sensitive)"
+                value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)} />
             </div>
             <div className="auth-field">
               <label>Password</label>

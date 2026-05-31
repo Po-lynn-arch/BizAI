@@ -3,6 +3,7 @@ import '../CSS/Simulation.css'
 import { useState, useEffect, useMemo } from 'react'
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function Simulation() {
   // ✅ Parse localStorage once, not on every render
@@ -161,6 +162,7 @@ export function Simulation() {
           </div>
         )}
       </div>
+      <BottomNavBar/>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
+import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function Stock() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
@@ -17,6 +18,9 @@ export function Stock() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [editProduct, setEditProduct] = useState('')
+
 
   function loadStock() {
     fetch(`${API_URL}/api/stock?user_id=${user.id}`)
@@ -245,7 +249,15 @@ export function Stock() {
           {stock.length === 0 ? <p className="empty-state">No stock added yet.</p> : (
             <table>
               <thead>
-                <tr><th>Product</th><th>Type</th><th>Bought</th><th>Remaining</th><th>Cost/Unit</th><th>Sell Price</th><th>Duration</th><th>Status</th></tr>
+                <tr>
+                  <th>Product</th>
+                  <th>Type</th><th>Bought</th>
+                  <th>Remaining</th>
+                  <th>Cost/Unit</th>
+                  <th>Sell Price</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                </tr>
               </thead>
               <tbody>
                 {stock.map(s => {
@@ -275,14 +287,46 @@ export function Stock() {
                           color
                         }}>{percent}% remaining</span>
                       </td>
+                      <td>
+                        <button onClick={() => { setEditId(s.id); setEditProduct(s.product) }}
+                          style={{ background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', marginRight: '6px' }}>
+                          ✏️
+                        </button>
+                        <button className="delete-btn" onClick={() => deleteStock(s.id)}>🗑</button>
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           )}
+          {editId && (
+            <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+              <p style={{ color: '#93c5fd', marginBottom: '8px', fontSize: '14px' }}>Editing product name:</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={editProduct} onChange={e => setEditProduct(e.target.value)}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', background: '#111', border: '1px solid #3b82f6', color: '#fff' }} />
+                <button onClick={async () => {
+                  await fetch(`${API_URL}/api/stock/${editId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product: editProduct })
+                  })
+                  setEditId(null)
+                  loadData()
+                }} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
+                  Save
+                </button>
+                <button onClick={() => setEditId(null)}
+                  style={{ background: 'transparent', color: '#aaa', border: '1px solid #2a2a2a', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      <BottomNavBar/>
     </div>
   )
 }
