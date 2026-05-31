@@ -83,12 +83,7 @@ export function OperationalExpenses() {
   const fixedExpenses = data.filter(d => d.is_fixed)
   const variableExpenses = data.filter(d => !d.is_fixed)
   const totalDailyCost = data.reduce((sum, d) => sum + getDailyAmount(d.amount, d.frequency), 0)
-  const totalMonthly = data.reduce((sum, d) => {
-    if (d.frequency === 'daily') return sum + (d.amount * 30)
-    if (d.frequency === 'weekly') return sum + (d.amount * 4)
-    if (d.frequency === 'once') return sum + d.amount
-    return sum + d.amount // monthly
-  }, 0)
+  
 
   const breakEvenGap = totalDailyCost - todayProfit
   const progressPercent = totalDailyCost > 0 ? Math.min((todayProfit / totalDailyCost) * 100, 100) : 0
