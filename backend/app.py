@@ -10,6 +10,8 @@ from itsdangerous import URLSafeTimedSerializer
 import random, string, os
 from datetime import datetime, timedelta
 import threading
+import africastalking
+
 
 
 app = Flask(__name__)
@@ -32,6 +34,14 @@ app.config['MAIL_TIMEOUT'] = 10
 mail = Mail(app)
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
+africastalking.initialize(
+    username=os.environ.get('AT_USERNAME', 'sandbox'),
+    api_key=os.environ.get('AT_API_KEY', '')
+
+)
+sms = africastalking.SMS
+reset_codes = {}
 
 MAX_ATTEMPTS = 5
 LOCK_MINUTES = 10
@@ -169,6 +179,7 @@ def init_db():
             ('sales', 'cost_per_unit', 'DECIMAL(10,2) DEFAULT 0'),
             ('sales', 'profit', 'DECIMAL(10,2) DEFAULT 0'),
             ('stock', 'stock_type', "VARCHAR(20) DEFAULT 'new'"),
+            ('users', 'phone', 'VARCHAR(20) NULL'),
         ]
         for table, column, definition in migrations:
             try:
@@ -211,9 +222,10 @@ def register():
         code = generate_code()
         cursor.execute('INSERT INTO businesses (name, code) VALUES (%s,%s)', (business_name, code))
         business_id = cursor.lastrowid
+        phone = data.get('phone', '').strip()
         cursor.execute(
-            'INSERT INTO users (name,email,password,role,business_id,is_verified) VALUES (%s,%s,%s,%s,%s,%s)',
-            (name, email, generate_password_hash(password), 'admin', business_id, True)
+            'INSERT INTO users (name,email,password,role,business_id,is_verified,phone) VALUES (%s,%s,%s,%s,%s,%s,%s)',
+            (name, email, generate_password_hash(password), 'admin', business_id, True, phone)
         )
         conn.commit()
 
@@ -330,45 +342,75 @@ def login():
     })
 
 
-@app.route('/api/forgot-password', methods=['POST'])
-def forgot_password():
-    email = request.get_json().get('email', '').strip()
-    if not email:
-        return jsonify({'error': 'Email required'}), 400
+@app.route('/api/forgot-password-sms', methods=['POST'])
+def forgot_password_sms():
+    data = request.get_json()
+    phone = data.get('phone', '').strip()
+    if not phone:
+        return jsonify({'error': 'Phone number required'}), 400
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT name FROM users WHERE email=%s', (email,))
+    cursor.execute('SELECT id, name FROM users WHERE phone=%s', (phone,))
     user = cursor.fetchone()
     conn.close()
-    if user:
-        token = serializer.dumps(email, salt='reset-password')
-        link = f"{FRONTEND_URL}/reset-password/{token}"
-        threading.Thread(target=send_email, args=(
-            'Reset your BizAI password', [email],
-            f"Hi {user[0]},\n\nClick to reset your password:\n{link}\n\nExpires in 1 hour.\n\nIf you did not request this, ignore this email.\n\nBizAI Team"
-        ), daemon=True).start()
-    return jsonify({'message': 'If that email exists, a reset link has been sent.'})
+
+    if not user:
+        return jsonify({'message': 'If that number exists a code has been sent'}), 200
+
+    # generate 6 digit code
+    code = ''.join(random.choices('0123456789', k=6))
+    reset_codes[phone] = {
+        'code': code,
+        'expires': datetime.now() + timedelta(minutes=10),
+        'user_id': user[0]
+    }
+
+    def send_sms():
+        try:
+            sms.send(
+                f"Your BizAI password reset code is: {code}. Expires in 10 minutes.",
+                [phone]
+            )
+            print(f'[BizAI] SMS sent to {phone}')
+        except Exception as e:
+            print(f'[BizAI] SMS failed: {e}')
+
+    threading.Thread(target=send_sms, daemon=True).start()
+    return jsonify({'message': 'Code sent to your phone'})
 
 
-@app.route('/api/reset-password/<token>', methods=['POST'])
-def reset_password(token):
-    try:
-        email = serializer.loads(token, salt='reset-password', max_age=3600)
-    except Exception:
-        return jsonify({'error': 'Invalid or expired token'}), 400
-    new_password = request.get_json().get('password', '')
+@app.route('/api/verify-reset-code', methods=['POST'])
+def verify_reset_code():
+    data = request.get_json()
+    phone = data.get('phone', '').strip()
+    code = data.get('code', '').strip()
+    new_password = data.get('password', '')
+
+    if not all([phone, code, new_password]):
+        return jsonify({'error': 'All fields required'}), 400
     if len(new_password) < 6:
         return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+    stored = reset_codes.get(phone)
+    if not stored:
+        return jsonify({'error': 'No reset code found. Request a new one.'}), 400
+    if datetime.now() > stored['expires']:
+        del reset_codes[phone]
+        return jsonify({'error': 'Code has expired. Request a new one.'}), 400
+    if stored['code'] != code:
+        return jsonify({'error': 'Invalid code. Try again.'}), 400
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        'UPDATE users SET password=%s, failed_attempts=0, locked_until=NULL WHERE email=%s',
-        (generate_password_hash(new_password), email)
+        'UPDATE users SET password=%s, failed_attempts=0, locked_until=NULL WHERE id=%s',
+        (generate_password_hash(new_password), stored['user_id'])
     )
     conn.commit()
     conn.close()
+    del reset_codes[phone]
     return jsonify({'message': 'Password reset successful!'})
-
 
 @app.route('/api/join-business', methods=['POST'])
 def join_business():
@@ -456,9 +498,12 @@ def get_business_users(admin_id):
 @app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     data = request.get_json()
+    admin_id = data.get('admin_id')
+    if user_id == admin_id:
+        return jsonify({'error': 'You cannot delete your own account'}), 400
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT role FROM users WHERE id=%s', (data.get('admin_id'),))
+    cursor.execute('SELECT role FROM users WHERE id=%s', (admin_id,))
     admin = cursor.fetchone()
     if not admin or admin[0] != 'admin':
         conn.close()
@@ -469,6 +514,18 @@ def delete_user(user_id):
     return jsonify({'message': 'User deleted'})
 
 
+@app.route('/api/business-code', methods=['GET'])
+def get_business_code():
+    user_id = request.args.get('user_id')
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT b.code FROM businesses b JOIN users u ON u.business_id = b.id WHERE u.id=%s',
+        (user_id,)
+    )
+    result = cursor.fetchone()
+    conn.close()
+    return jsonify({'code': result[0] if result else None})
 # ========================
 # STOCK
 # ========================
@@ -721,8 +778,10 @@ def get_summary():
             daily_operational += amt
         elif freq == 'weekly':
             daily_operational += amt / 7
-        else:
+        elif freq == 'monthly':
             daily_operational += amt / 30
+        elif freq == 'once':
+            daily_operational += 0  # one-time costs don't count as daily
 
     conn.close()
     return jsonify({
@@ -837,22 +896,59 @@ def get_predictions_route():
     except Exception:
         predictions = None
 
+
     if not predictions:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
-            'SELECT product, SUM(qty_sold) as total_qty, SUM(total_earned) as revenue FROM sales WHERE user_id=%s GROUP BY product ORDER BY total_qty DESC LIMIT 3',
+            '''SELECT product, SUM(qty_sold) as total_qty, SUM(total_earned) as revenue,
+            SUM(profit) as total_profit
+            FROM sales WHERE user_id=%s GROUP BY product ORDER BY total_qty DESC''',
             (user_id,)
         )
         rows = cursor.fetchall()
+        cursor.execute(
+            'SELECT product, qty_remaining, qty_bought FROM stock WHERE user_id=%s',
+            (user_id,)
+        )
+        stock_rows = cursor.fetchall()
         conn.close()
-        predictions = [{
-            'product': r[0], 'total_qty': int(r[1]), 'revenue': float(r[2]),
-            'prediction': 'High demand — stock up on this product', 'confidence': 'N/A'
-        } for r in rows]
+
+        stock_map = {r[0]: {'qty_remaining': int(r[1]), 'qty_bought': int(r[2])} for r in stock_rows}
+
+        predictions = []
+        for row in rows:
+            product = row[0]
+            total_qty = int(row[1])
+            revenue = float(row[2])
+            profit = float(row[3])
+            stock_info = stock_map.get(product, {})
+            qty_remaining = stock_info.get('qty_remaining', 0)
+            qty_bought = stock_info.get('qty_bought', 1)
+            sell_through = ((qty_bought - qty_remaining) / qty_bought * 100) if qty_bought > 0 else 0
+
+            if sell_through >= 80:
+                recommendation = f"🔥 High demand — {sell_through:.0f}% sold. Restock soon."
+            elif sell_through >= 50:
+                recommendation = f"📈 Selling well — {sell_through:.0f}% sold. Monitor stock."
+            else:
+                recommendation = f"📦 Slow mover — only {sell_through:.0f}% sold. Consider reducing price."
+
+            predictions.append({
+                'product': product,
+                'total_qty': total_qty,
+                'revenue': revenue,
+                'profit': profit,
+                'sell_through': round(sell_through, 1),
+                'qty_remaining': qty_remaining,
+                'prediction': recommendation,
+                'confidence': 'Sell-through analysis'
+            })
+
+        predictions.sort(key=lambda x: x['sell_through'], reverse=True)
+        predictions = predictions[:5]
 
     return jsonify(predictions)
-
 
 # ========================
 # SIMULATION

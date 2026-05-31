@@ -2,8 +2,7 @@ import '../CSS/Dashboard.css'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Sidebar } from '../../components/Sidebar'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000'
+import { API_URL } from '../../hooks/config'
 
 export function AdminPage() {
   const navigate = useNavigate()
@@ -15,17 +14,20 @@ export function AdminPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [businessCode, setBusinessCode] = useState('')
 
   function loadUsers() {
     Promise.all([
-      fetch(`${API_URL}/api/admin/users/${user.id}`).then(r => r.json())
-    ]).then(([usersData]) => {
+      fetch(`${API_URL}/api/admin/users/${user.id}`).then(r => r.json()),
+      fetch(`${API_URL}/api/business-code?user_id=${user.id}`).then(r => r.json())
+    ]).then(([usersData, codeData]) => {
       if (Array.isArray(usersData)) {
         setUsers(usersData)
       } else {
         setUsers([])
         if (usersData.error) setError(usersData.error)
       }
+      setBusinessCode(codeData.code || '')
     }).catch(() => setUsers([]))
   }
 
@@ -60,6 +62,7 @@ export function AdminPage() {
   }
 
   async function removeUser(userId) {
+    if (!window.confirm('Are you sure you want to remove this user?')) return
     try {
       await fetch(`${API_URL}/api/admin/users/${userId}`, {
         method: 'DELETE',
@@ -83,10 +86,33 @@ export function AdminPage() {
           </div>
         </header>
 
+        {/* BUSINESS CODE */}
+        {businessCode && (
+          <div style={{
+            background: '#0d2b1f', border: '1px solid #10B981',
+            borderRadius: '12px', padding: '20px', marginBottom: '24px', textAlign: 'center'
+          }}>
+            <p style={{ color: '#aaa', fontSize: '13px', marginBottom: '8px' }}>
+              Your Business Code — share this with your second user
+            </p>
+            <p style={{ color: '#10B981', fontSize: '28px', fontWeight: 'bold', letterSpacing: '6px' }}>
+              {businessCode}
+            </p>
+            <p style={{ color: '#666', fontSize: '12px', marginTop: '6px' }}>
+              They can use this code when registering to join your business
+            </p>
+          </div>
+        )}
+
+        {/* ADD USER FORM */}
         <div className="entry-form">
-          <h3>Add a Second User</h3>
-          <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#93c5fd', fontSize: '14px' }}>
-            💡 You can add one more user to your business. They will have access to all your business data. Maximum 2 users per business.
+          <h3 style={{ marginBottom: '16px', fontSize: '15px', color: '#f1f5f9' }}>Add a Second User</h3>
+          <div style={{
+            background: '#0d1b2b', border: '1px solid #3b82f6',
+            borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
+            color: '#93c5fd', fontSize: '14px'
+          }}>
+            💡 Maximum 2 users per business. The second user will have access to all your business data.
           </div>
           <div className="form-row">
             <div className="form-field">
@@ -109,6 +135,7 @@ export function AdminPage() {
           </button>
         </div>
 
+        {/* USERS TABLE */}
         <div className="recent-sales">
           <h3>Business Users ({users.length}/2)</h3>
           {users.length === 0 ? (

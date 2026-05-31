@@ -8,3 +8,4 @@ werkzeug
 itsdangerous
 gunicorn
 python-dotenv
+africastalking

@@ -30,6 +30,7 @@ export function Register() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [phone, setPhone] = useState('')
 
   async function handleRegister() {
     setError('')
@@ -38,13 +39,14 @@ export function Register() {
     if (password !== confirm) { setError('Passwords do not match'); return }
     if (mode === 'new' && !businessName) { setError('Please enter your business name'); return }
     if (mode === 'join' && !code) { setError('Please enter your business code'); return }
+    if (mode === 'new' && !phone) { setError('Please enter your phone number'); return }
 
     setLoading(true)
     const endpoint = mode === 'new' ? '/api/register' : '/api/join-business'
     const body = mode === 'new'
-      ? { name, email, password, business_name: businessName }
-      : { name, email, password, code }
-
+      ? {name, email, password, business_name: businessName, phone}
+      : {name, email, password, code}
+    
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
@@ -120,6 +122,19 @@ export function Register() {
             <div className="auth-field">
               <label>Email Address</label>
               <input placeholder="your@email.com" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+            </div>
+           
+            <div className="auth-field">
+              <label>Phone Number</label>
+              <input
+                placeholder="e.g. 0712345678"
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+              />
+              <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                Used for password reset via SMS
+              </p>
             </div>
             <div className="auth-field">
               <label>Password</label>

@@ -172,25 +172,9 @@ export function SalesEntry() {
   }
 
   async function deleteSale(id) {
-    // ✅ Optimistic update — remove instantly
-    const deleted = sales.find(s => s.id === id)
-    setSales(prev => prev.filter(s => s.id !== id))
-
-    // Restore stock qty optimistically
-    if (deleted) {
-      setStock(prev => prev.map(s =>
-        s.product === deleted.product
-          ? { ...s, qty_remaining: s.qty_remaining + deleted.qty_sold }
-          : s
-      ))
-    }
-
-    try {
-      await fetch(`${API_URL}/api/sales/${id}`, { method: 'DELETE' })
-    } catch {
-      // Revert if failed
-      loadData()
-    }
+    if (!window.confirm('Are you sure you want to delete this sale? Stock will be restored.')) return
+    await fetch(`${API_URL}/api/sales/${id}`, { method: 'DELETE' })
+    loadData()
   }
 
   return (

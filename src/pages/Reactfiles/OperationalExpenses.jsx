@@ -67,30 +67,29 @@ export function OperationalExpenses() {
   }
 
   async function deleteExpense(id) {
-    // ✅ Optimistic update — remove from UI instantly
-    const prev = data
-    setData(d => d.filter(x => x.id !== id))
-
-    try {
-      await fetch(`${API_URL}/api/operational-expenses/${id}`, { method: 'DELETE' })
-    } catch {
-      // Revert if failed
-      setData(prev)
-      alert('Failed to delete. Please try again.')
-    }
+    if (!window.confirm('Are you sure you want to delete this expense?')) return
+    await fetch(`${API_URL}/api/operational-expenses/${id}`, { method: 'DELETE' })
+    loadData()
   }
 
-  const getDailyAmount = (amount, frequency) => {
-    if (frequency === 'daily') return amount
-    if (frequency === 'weekly') return amount / 7
-    if (frequency === 'monthly') return amount / 30
-    return amount / 30
-  }
+  const totalMonthly = data.reduce((sum, d) => {
+    if (d.frequency === 'daily') return sum + (d.amount * 30)
+    if (d.frequency === 'weekly') return sum + (d.amount * 4)
+    if (d.frequency === 'once') return sum + d.amount
+    return sum + d.amount // monthly
+  }, 0)
+
 
   const fixedExpenses = data.filter(d => d.is_fixed)
   const variableExpenses = data.filter(d => !d.is_fixed)
   const totalDailyCost = data.reduce((sum, d) => sum + getDailyAmount(d.amount, d.frequency), 0)
-  const totalMonthly = data.reduce((sum, d) => sum + d.amount, 0)
+  const totalMonthly = data.reduce((sum, d) => {
+    if (d.frequency === 'daily') return sum + (d.amount * 30)
+    if (d.frequency === 'weekly') return sum + (d.amount * 4)
+    if (d.frequency === 'once') return sum + d.amount
+    return sum + d.amount // monthly
+  }, 0)
+
   const breakEvenGap = totalDailyCost - todayProfit
   const progressPercent = totalDailyCost > 0 ? Math.min((todayProfit / totalDailyCost) * 100, 100) : 0
 
@@ -162,27 +161,23 @@ export function OperationalExpenses() {
         </div>
 
         <div className="entry-form">
-          <div style={{
-            display: 'flex', background: '#1a1a1a',
-            borderRadius: '10px', padding: '4px',
-            marginBottom: '16px', gap: '4px'
-          }}>
-            <button onClick={() => setIsFixed(true)} style={{
-              flex: 1, padding: '10px', borderRadius: '8px',
-              cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              background: isFixed ? '#F97316' : 'transparent',
-              color: isFixed ? '#fff' : '#aaa',
-              border: 'none', transition: 'all 0.2s'
-            }}>🏠 Fixed Cost</button>
-            <button onClick={() => setIsFixed(false)} style={{
-              flex: 1, padding: '10px', borderRadius: '8px',
-              cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-              background: !isFixed ? '#8B5CF6' : 'transparent',
-              color: !isFixed ? '#fff' : '#aaa',
-              border: 'none', transition: 'all 0.2s'
-            }}>🚗 Variable Cost</button>
-          </div>
 
+          {frequency !== 'once' && (
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button onClick={() => setIsFixed(true)} style={{
+                flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
+                background: isFixed ? '#ff4444' : 'transparent',
+                color: isFixed ? '#fff' : '#aaa',
+                border: isFixed ? 'none' : '1px solid #2a2a2a'
+              }}>🏠 Fixed (same every time)</button>
+              <button onClick={() => setIsFixed(false)} style={{
+                flex: 1, padding: '8px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px',
+                background: !isFixed ? '#FFA500' : 'transparent',
+                color: !isFixed ? '#fff' : '#aaa',
+                border: !isFixed ? 'none' : '1px solid #2a2a2a'
+              }}>🚗 Variable (changes)</button>
+            </div>
+          )}
           <div style={{
             background: isFixed ? '#1a0e00' : '#120d1a',
             border: `1px solid ${isFixed ? '#F97316' : '#8B5CF6'}`,
