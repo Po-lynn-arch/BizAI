@@ -1,9 +1,9 @@
 import '../CSS/LandingPage.css'
 import { useNavigate } from 'react-router-dom'
-// ✅ Memoized with React.memo to prevent unnecessary re-renders if parent ever re-renders
+
+//Memoized with React.memo to prevent unnecessary re-renders if parent ever re-renders
 import { memo } from 'react'
 
-// ✅ Split heavy sections into memoized sub-components so they don't re-render on navigate state changes
 const FeaturesSection = memo(function FeaturesSection() {
   return (
     <section className="features-section" id="features">

@@ -290,7 +290,6 @@ def login():
     conn = get_db()
     cursor = conn.cursor()
 
-    # ✅ UPDATED — joins businesses table to get business_name
     cursor.execute(
         '''SELECT u.id, u.name, u.email, u.password, u.role, u.business_id,
                   u.is_verified, u.failed_attempts, u.locked_until, b.name as business_name
@@ -328,7 +327,6 @@ def login():
     conn.commit()
     conn.close()
 
-    # ✅ UPDATED — includes business_name in response
     return jsonify({
         'message': 'Login successful',
         'user': {

@@ -194,7 +194,7 @@ export function ForgotPassword() {
               </>
             )}
 
-            {/* PHONE MODE — STEP 2 */}
+            {/* PHONE MODE */}
             {mode === 'phone' && step === 2 && (
               <>
                 <div style={{ background: '#0d2b1f', border: '1px solid #10B981', borderRadius: '8px', padding: '12px', marginBottom: '16px', color: '#10B981', fontSize: '13px' }}>
