@@ -17,7 +17,7 @@ import africastalking
 app = Flask(__name__)
 
 CORS(app, origins=[
-    "https://bizai-d49076.netlify.app",
+    "https://biz-ai-oyk4.vercel.app",
     "http://localhost:5173"
 ], supports_credentials=True, allow_headers=["Content-Type", "Authorization"], methods=["GET", "POST", "DELETE", "OPTIONS"])
 
