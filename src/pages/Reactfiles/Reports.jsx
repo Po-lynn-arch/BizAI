@@ -4,18 +4,32 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Ba
 import { Sidebar } from '../../components/Sidebar'
 import { useBusinessData } from '../../hooks/useBusinessData'
 import { BottomNavBar } from '../../components/BottomNavBar'
+import { getToday } from '../../hooks/config'
 
 export function Reports() {
   const user = useMemo(() => JSON.parse(localStorage.getItem('user') || '{}'), [])
   const { sales, expenses, weekly, loading } = useBusinessData(user.id)
   const [tab, setTab] = useState('overview')
 
-  const today = new Date().toLocaleDateString()
-  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+  const today = getToday()
+
+  // Build a 7-day cutoff string in the same M/D/YYYY format as stored dates
+  const weekAgoDate = new Date()
+  weekAgoDate.setDate(weekAgoDate.getDate() - 7)
+  const weekAgoStr = `${weekAgoDate.getMonth() + 1}/${weekAgoDate.getDate()}/${weekAgoDate.getFullYear()}`
+
+  // Helper: parse a M/D/YYYY string into a real Date for comparison
+  function parseStoredDate(str) {
+    if (!str) return new Date(0)
+    const [m, d, y] = str.split('/')
+    return new Date(Number(y), Number(m) - 1, Number(d))
+  }
+
+  const cutoff = parseStoredDate(weekAgoStr)
 
   const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
   const todayProfit = sales.filter(s => s.date === today).reduce((sum, s) => sum + (s.profit || 0), 0)
-  const weeklyProfit = sales.filter(s => new Date(s.date) >= weekAgo).reduce((sum, s) => sum + (s.profit || 0), 0)
+  const weeklyProfit = sales.filter(s => parseStoredDate(s.date) >= cutoff).reduce((sum, s) => sum + (s.profit || 0), 0)
   const totalRevenue = sales.reduce((sum, s) => sum + (s.total_earned || 0), 0)
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0)
 
@@ -221,7 +235,7 @@ export function Reports() {
           </>
         )}
       </div>
-      <BottomNavBar/>
+      <BottomNavBar />
     </div>
   )
 }

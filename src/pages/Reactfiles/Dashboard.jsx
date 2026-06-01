@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
 import { Sidebar } from '../../components/Sidebar'
 import { useSessionExpiry } from '../../hooks/useSessionExpiry'
-import { API_URL } from '../../hooks/config'
+import { API_URL, getToday } from '../../hooks/config'
 import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function Dashboard() {
@@ -14,7 +14,6 @@ export function Dashboard() {
   const [reminders, setReminders] = useState([])
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
-  
 
   useEffect(() => {
     if (!user.id) return
@@ -31,10 +30,7 @@ export function Dashboard() {
     }).finally(() => setLoading(false))
   }, [user.id])
 
-  const today = useMemo(() => {
-    const now = new Date()
-    return `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`
-  }, [])
+  const today = useMemo(() => getToday(), [])
 
   const { todaySales, todayProfit, totalProfit, totalRevenue, chartData } = useMemo(() => {
     const todaySales = sales.filter(s => s.date === today)
@@ -196,7 +192,7 @@ export function Dashboard() {
         )}
 
       </div>
-      <BottomNavBar/>
+      <BottomNavBar />
     </div>
   )
 }
