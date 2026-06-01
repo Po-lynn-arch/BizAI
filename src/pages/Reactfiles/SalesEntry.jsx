@@ -1,7 +1,7 @@
 import '../CSS/DataEntry.css'
 import { useState, useEffect } from 'react'
 import { Sidebar } from '../../components/Sidebar'
-import { API_URL } from '../../hooks/config'
+import { API_URL, getToday } from '../../hooks/config'
 import { BottomNavBar } from '../../components/BottomNavBar'
 
 export function SalesEntry() {
@@ -30,10 +30,11 @@ export function SalesEntry() {
   useEffect(() => { loadData() }, [])
 
   const selectedStock = stock.find(s => s.product === product)
-  const today = new Date().toLocaleDateString()
   const todaySales = sales.filter(s => s.date === today)
   const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
   const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
+ 
+  const today = getToday()
 
   function addEntry() { setEntries([...entries, { qty_sold: '', price_per_unit: '' }]) }
   function removeEntry(idx) {
