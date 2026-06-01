@@ -41,12 +41,11 @@ export function Register() {
     if (password !== confirm) { setError('Passwords do not match'); return }
     if (mode === 'new' && !businessName) { setError('Please enter your business name'); return }
     if (mode === 'join' && !code) { setError('Please enter your business code'); return }
-    if (mode === 'new' && !phone) { setError('Please enter your phone number'); return }
-
+    
     setLoading(true)
     const endpoint = mode === 'new' ? '/api/register' : '/api/join-business'
     const body = mode === 'new'
-      ? {name, email, password, business_name: businessName, phone}
+      ? {name, email, password, business_name: businessName}
       : {name, email, password, code}
     
     try {
