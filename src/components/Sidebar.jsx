@@ -17,7 +17,6 @@ export function Sidebar() {
   const location = useLocation()
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   const [collapsed, setCollapsed] = useState(false)
- 
 
   function toggleCollapse() {
     const next = !collapsed
@@ -42,7 +41,8 @@ export function Sidebar() {
       <div className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
         <div className="sidebar-top">
           <span className="logo">{collapsed ? 'B' : 'BizAI'}</span>
-          <button className="collapse-btn" onClick={toggleCollapse}>
+          <button className="collapse-btn" onClick={toggleCollapse}
+            title={collapsed ? 'Expand' : 'Collapse'}>
             {collapsed ? '→' : '←'}
           </button>
         </div>
@@ -77,9 +77,9 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* MOBILE BOTTOM NAV */}
+      {/* MOBILE BOTTOM NAV — all 7 links + logout, scrollable */}
       <nav className="mobile-nav">
-        {navLinks.slice(0, 5).map(link => (
+        {navLinks.map(link => (
           <Link
             key={link.to}
             to={link.to}
@@ -89,6 +89,15 @@ export function Sidebar() {
             <span className="mobile-nav__label">{link.label}</span>
           </Link>
         ))}
+        {user.role === 'admin' && (
+          <Link
+            to="/Admin"
+            className={`mobile-nav__item ${isActive('/Admin') ? 'mobile-nav__item--active' : ''}`}
+          >
+            <span className="mobile-nav__icon">⚙️</span>
+            <span className="mobile-nav__label">Admin</span>
+          </Link>
+        )}
         <button className="mobile-nav__item mobile-nav__item--logout" onClick={logout}>
           <span className="mobile-nav__icon">⬅</span>
           <span className="mobile-nav__label">Logout</span>

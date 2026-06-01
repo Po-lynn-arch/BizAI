@@ -4,6 +4,7 @@ import { Sidebar } from '../../components/Sidebar'
 import { API_URL } from '../../hooks/config'
 import { BottomNavBar } from '../../components/BottomNavBar'
 
+
 export function Stock() {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   const [stock, setStock] = useState([])
@@ -18,9 +19,7 @@ export function Stock() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
-  const [editId, setEditId] = useState(null)
-  const [editProduct, setEditProduct] = useState('')
-
+  const [durationWarning, setDurationWarning] = useState('')
 
   function loadStock() {
     fetch(`${API_URL}/api/stock?user_id=${user.id}`)
@@ -30,6 +29,21 @@ export function Stock() {
   }
 
   useEffect(() => { loadStock() }, [])
+
+  // Duration warning logic
+  function handleDurationChange(val) {
+    setDuration(val)
+    const days = Number(val)
+    if (days >= 90) {
+      setDurationWarning('⚠️ Stocking for 90+ days is risky — products may expire, go out of season, or tie up capital unnecessarily. Consider smaller, more frequent restocks.')
+    } else if (days >= 60) {
+      setDurationWarning('⚠️ 60+ days is a long time to hold stock. Make sure this product has a long shelf life and consistent demand before committing.')
+    } else if (days >= 45) {
+      setDurationWarning('💡 45+ days of stock is on the higher end. Ensure demand is consistent before purchasing this quantity.')
+    } else {
+      setDurationWarning('')
+    }
+  }
 
   function addEntry() { setEntries([...entries, { qty_bought: '', cost_per_unit: '', suggested_price: '' }]) }
   function removeEntry(idx) {
@@ -45,14 +59,23 @@ export function Stock() {
   async function addStock() {
     setError(''); setSuccess('')
     if (!product) { setError('Please enter a product name'); return }
+
+    // Confirm if duration is risky
+    const days = Number(duration)
+    if (days >= 90) {
+      const confirmed = window.confirm(
+        `⚠️ You are stocking for ${days} days (${Math.round(days/30)} months). This is considered high-risk as products may expire, go out of season, or tie up capital. Are you sure you want to continue?`
+      )
+      if (!confirmed) return
+    }
+
     setLoading(true)
 
     try {
       if (mode === 'single') {
-        if (!qty) { setError('Please enter quantity'); return }
-        if (stockType === 'new' && !cost) { setError('Please enter cost per unit'); return }
+        if (!qty) { setError('Please enter quantity'); setLoading(false); return }
+        if (stockType === 'new' && !cost) { setError('Please enter cost per unit'); setLoading(false); return }
 
-        // ✅ Optimistic update
         const tempStock = {
           id: `temp_${Date.now()}`,
           product, qty_bought: Number(qty),
@@ -65,7 +88,7 @@ export function Stock() {
           date_added: new Date().toLocaleDateString()
         }
         setStock(prev => [tempStock, ...prev])
-        setProduct(''); setQty(''); setCost(''); setSuggestedPrice(''); setDuration('30')
+        setProduct(''); setQty(''); setCost(''); setSuggestedPrice(''); setDuration('30'); setDurationWarning('')
 
         const res = await fetch(`${API_URL}/api/stock`, {
           method: 'POST',
@@ -90,7 +113,7 @@ export function Stock() {
         }
       } else {
         const validEntries = entries.filter(e => Number(e.qty_bought) > 0)
-        if (validEntries.length === 0) { setError('Add at least one entry with quantity'); return }
+        if (validEntries.length === 0) { setError('Add at least one entry with quantity'); setLoading(false); return }
 
         for (const e of validEntries) {
           await fetch(`${API_URL}/api/stock`, {
@@ -109,7 +132,7 @@ export function Stock() {
         }
         setSuccess('All stock entries added!')
         setEntries([{ qty_bought: '', cost_per_unit: '', suggested_price: '' }])
-        setProduct('')
+        setProduct(''); setDurationWarning('')
         loadStock()
       }
     } catch {
@@ -155,17 +178,39 @@ export function Stock() {
           <div className="form-row" style={{ marginBottom: '16px' }}>
             <div className="form-field">
               <label>Product Name</label>
-              <input placeholder="e.g. Milk, Bread, Trousers" value={product} onChange={e => setProduct(e.target.value)} />
+              <input
+                placeholder="e.g. Milk, Bread, Trousers"
+                value={product}
+                onChange={e => setProduct(e.target.value)}
+              />
             </div>
             <div className="form-field">
-              <label>This stock is for</label>
-              <select value={duration} onChange={e => setDuration(e.target.value)}>
-                <option value="1">Today only (1 day)</option>
-                <option value="7">This week (7 days)</option>
-                <option value="30">This month (30 days)</option>
-              </select>
+              <label>Duration (days)</label>
+              <input
+                type="number"
+                placeholder="e.g. 30"
+                min="1"
+                value={duration}
+                onChange={e => handleDurationChange(e.target.value)}
+              />
+              <p style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                How many days will this stock last?
+              </p>
             </div>
           </div>
+
+          {/* Duration warning */}
+          {durationWarning && (
+            <div style={{
+              background: Number(duration) >= 90 ? '#2b0d0d' : '#1a1400',
+              border: `1px solid ${Number(duration) >= 90 ? '#ff4444' : '#FFA500'}`,
+              borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
+              color: Number(duration) >= 90 ? '#ff4444' : '#FFA500',
+              fontSize: '13px'
+            }}>
+              {durationWarning}
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             {[['single', '📦 Single Entry'], ['multi', '🗂 Multiple Entries']].map(([m, label]) => (
@@ -251,7 +296,8 @@ export function Stock() {
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>Type</th><th>Bought</th>
+                  <th>Type</th>
+                  <th>Bought</th>
                   <th>Remaining</th>
                   <th>Cost/Unit</th>
                   <th>Sell Price</th>
@@ -279,7 +325,7 @@ export function Stock() {
                       <td style={{ color, fontWeight: 'bold' }}>{s.qty_remaining} units</td>
                       <td>KES {s.cost_per_unit}</td>
                       <td>KES {s.suggested_price || '—'}</td>
-                      <td>{s.duration_days === 1 ? 'Daily' : s.duration_days === 7 ? 'Weekly' : 'Monthly'}</td>
+                      <td>{s.duration_days} days</td>
                       <td>
                         <span style={{
                           padding: '3px 8px', borderRadius: '8px', fontSize: '12px',
@@ -287,42 +333,11 @@ export function Stock() {
                           color
                         }}>{percent}% remaining</span>
                       </td>
-                      <td>
-                        <button onClick={() => { setEditId(s.id); setEditProduct(s.product) }}
-                          style={{ background: 'transparent', border: '1px solid #3b82f6', color: '#3b82f6', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', marginRight: '6px' }}>
-                          ✏️
-                        </button>
-                        <button className="delete-btn" onClick={() => deleteStock(s.id)}>🗑</button>
-                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
-          )}
-          {editId && (
-            <div style={{ background: '#0d1b2b', border: '1px solid #3b82f6', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-              <p style={{ color: '#93c5fd', marginBottom: '8px', fontSize: '14px' }}>Editing product name:</p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={editProduct} onChange={e => setEditProduct(e.target.value)}
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', background: '#111', border: '1px solid #3b82f6', color: '#fff' }} />
-                <button onClick={async () => {
-                  await fetch(`${API_URL}/api/stock/${editId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ product: editProduct })
-                  })
-                  setEditId(null)
-                  loadData()
-                }} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer' }}>
-                  Save
-                </button>
-                <button onClick={() => setEditId(null)}
-                  style={{ background: 'transparent', color: '#aaa', border: '1px solid #2a2a2a', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
           )}
         </div>
       </div>
