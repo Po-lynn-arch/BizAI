@@ -28,13 +28,13 @@ export function SalesEntry() {
   }
 
   useEffect(() => { loadData() }, [])
-
+  const today = getToday()
   const selectedStock = stock.find(s => s.product === product)
   const todaySales = sales.filter(s => s.date === today)
   const todayProfit = todaySales.reduce((sum, s) => sum + (s.profit || 0), 0)
   const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0)
  
-  const today = getToday()
+  
 
   function addEntry() { setEntries([...entries, { qty_sold: '', price_per_unit: '' }]) }
   function removeEntry(idx) {
